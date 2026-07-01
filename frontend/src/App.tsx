@@ -4,6 +4,10 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { UsersPage } from "./pages/UsersPage";
+import { AssetsPage } from "./pages/AssetsPage";
+import { BorrowingPage } from "./pages/BorrowingPage";
+import { ConfigurationsPage } from "./pages/ConfigurationsPage";
+import { AuditLogsPage } from "./pages/AuditLogsPage";
 
 export function App() {
   return (
@@ -12,7 +16,11 @@ export function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/assets" element={<AssetsPage />} />
+          <Route path="/borrowing" element={<BorrowingPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/admin/configurations" element={<ConfigurationsPage />} />
+          <Route path="/audit-logs" element={<AuditLogsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

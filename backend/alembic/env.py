@@ -8,6 +8,8 @@ from app.database.base import Base
 from app.users.models import User
 from app.departments.models import Department
 from app.audit.models import AuditLog
+from app.assets.models import AssetCategory, Location, Supplier, Asset, AssetHistory
+from app.borrowing.models import BorrowRequest, BorrowRequestItem, BorrowTransaction
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
