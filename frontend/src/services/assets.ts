@@ -12,6 +12,19 @@ export async function createCategory(data: { name: string; description?: string 
   });
 }
 
+export async function updateCategory(id: number, data: { name?: string; description?: string; is_active?: boolean }): Promise<AssetCategory> {
+  return apiRequest<AssetCategory>(`/assets/categories/${id}`, {
+    method: "PATCH",
+    json: data
+  });
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+  return apiRequest<void>(`/assets/categories/${id}`, {
+    method: "DELETE"
+  });
+}
+
 export async function listLocations(): Promise<Location[]> {
   return apiRequest<Location[]>("/assets/locations");
 }
@@ -23,6 +36,19 @@ export async function createLocation(data: { name: string; description?: string 
   });
 }
 
+export async function updateLocation(id: number, data: { name?: string; description?: string; is_active?: boolean }): Promise<Location> {
+  return apiRequest<Location>(`/assets/locations/${id}`, {
+    method: "PATCH",
+    json: data
+  });
+}
+
+export async function deleteLocation(id: number): Promise<void> {
+  return apiRequest<void>(`/assets/locations/${id}`, {
+    method: "DELETE"
+  });
+}
+
 export async function listSuppliers(): Promise<Supplier[]> {
   return apiRequest<Supplier[]>("/assets/suppliers");
 }
@@ -31,6 +57,19 @@ export async function createSupplier(data: { name: string; contact_info?: string
   return apiRequest<Supplier>("/assets/suppliers", {
     method: "POST",
     json: data
+  });
+}
+
+export async function updateSupplier(id: number, data: { name?: string; contact_info?: string; is_active?: boolean }): Promise<Supplier> {
+  return apiRequest<Supplier>(`/assets/suppliers/${id}`, {
+    method: "PATCH",
+    json: data
+  });
+}
+
+export async function deleteSupplier(id: number): Promise<void> {
+  return apiRequest<void>(`/assets/suppliers/${id}`, {
+    method: "DELETE"
   });
 }
 
@@ -89,4 +128,10 @@ export async function archiveAsset(id: number): Promise<Asset> {
 
 export async function getAssetHistory(id: number): Promise<any[]> {
   return apiRequest<any[]>(`/assets/${id}/history`);
+}
+
+export async function reprintQrCode(id: number): Promise<any> {
+  return apiRequest<any>(`/assets/${id}/reprint-qr`, {
+    method: "POST"
+  });
 }

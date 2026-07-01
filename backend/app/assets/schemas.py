@@ -6,12 +6,15 @@ from app.assets.models import AssetStatus
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     description: str | None = Field(default=None, max_length=500)
+    is_active: bool | None = Field(default=True)
 
 class CategoryRead(BaseModel):
     id: int
     name: str
     description: str | None
     is_archived: bool
+    is_active: bool
+    usage_count: int | None = Field(default=0)
     created_at: datetime
     updated_at: datetime
 
@@ -22,12 +25,15 @@ class CategoryRead(BaseModel):
 class LocationCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     description: str | None = Field(default=None, max_length=500)
+    is_active: bool | None = Field(default=True)
 
 class LocationRead(BaseModel):
     id: int
     name: str
     description: str | None
     is_archived: bool
+    is_active: bool
+    usage_count: int | None = Field(default=0)
     created_at: datetime
     updated_at: datetime
 
@@ -38,12 +44,15 @@ class LocationRead(BaseModel):
 class SupplierCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     contact_info: str | None = Field(default=None)
+    is_active: bool | None = Field(default=True)
 
 class SupplierRead(BaseModel):
     id: int
     name: str
     contact_info: str | None
     is_archived: bool
+    is_active: bool
+    usage_count: int | None = Field(default=0)
     created_at: datetime
     updated_at: datetime
 
@@ -75,6 +84,15 @@ class AssetCreate(BaseModel):
     location_id: int
     supplier_id: int | None = Field(default=None)
 
+    purchase_date: datetime | None = Field(default=None)
+    purchase_cost: float | None = Field(default=None)
+    invoice_number: str | None = Field(default=None, max_length=100)
+    warranty_expiry: datetime | None = Field(default=None)
+    purchase_notes: str | None = Field(default=None)
+    photos: list[str] | None = Field(default_factory=list)
+    notes: str | None = Field(default=None)
+    condition: str | None = Field(default="Good")
+
 class AssetUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     serial_number: str | None = Field(default=None, max_length=100)
@@ -84,6 +102,15 @@ class AssetUpdate(BaseModel):
     category_id: int | None = Field(default=None)
     location_id: int | None = Field(default=None)
     supplier_id: int | None = Field(default=None)
+
+    purchase_date: datetime | None = Field(default=None)
+    purchase_cost: float | None = Field(default=None)
+    invoice_number: str | None = Field(default=None, max_length=100)
+    warranty_expiry: datetime | None = Field(default=None)
+    purchase_notes: str | None = Field(default=None)
+    photos: list[str] | None = Field(default=None)
+    notes: str | None = Field(default=None)
+    condition: str | None = Field(default=None)
 
 class AssetRead(BaseModel):
     id: int
@@ -99,8 +126,35 @@ class AssetRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    purchase_date: datetime | None
+    purchase_cost: float | None
+    invoice_number: str | None
+    warranty_expiry: datetime | None
+    purchase_notes: str | None
+    photos: list[str]
+    notes: str | None
+    condition: str
+
     category: CategoryRead
     location: LocationRead
     supplier: SupplierRead | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=80)
+    description: str | None = Field(default=None, max_length=500)
+    is_active: bool | None = Field(default=None)
+
+
+class LocationUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=80)
+    description: str | None = Field(default=None, max_length=500)
+    is_active: bool | None = Field(default=None)
+
+
+class SupplierUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=80)
+    contact_info: str | None = Field(default=None)
+    is_active: bool | None = Field(default=None)

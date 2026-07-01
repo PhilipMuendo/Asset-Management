@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
-from sqlalchemy import Boolean, ForeignKey, String, Enum, Text, DateTime, func
+from sqlalchemy import Boolean, ForeignKey, String, Enum, Text, DateTime, func, Float, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 from app.database.mixins import TimestampMixin
@@ -27,6 +27,7 @@ class AssetCategory(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     description: Mapped[str | None] = mapped_column(String(500))
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     assets: Mapped[list[Asset]] = relationship(back_populates="category")
 
@@ -38,6 +39,7 @@ class Location(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     description: Mapped[str | None] = mapped_column(String(500))
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     assets: Mapped[list[Asset]] = relationship(back_populates="location")
 
@@ -49,6 +51,7 @@ class Supplier(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     contact_info: Mapped[str | None] = mapped_column(Text)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     assets: Mapped[list[Asset]] = relationship(back_populates="supplier")
 
@@ -70,6 +73,16 @@ class Asset(TimestampMixin, Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("asset_categories.id"))
     location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"))
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True)
+
+    # Enterprise extensions
+    purchase_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    purchase_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    invoice_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    warranty_expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    purchase_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photos: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    condition: Mapped[str] = mapped_column(String(40), default="Good", nullable=False)
 
     category: Mapped[AssetCategory] = relationship(back_populates="assets")
     location: Mapped[Location] = relationship(back_populates="assets")

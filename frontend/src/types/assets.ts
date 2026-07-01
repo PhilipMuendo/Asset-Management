@@ -7,6 +7,8 @@ export interface AssetCategory {
   name: string;
   description: string | null;
   is_archived: boolean;
+  is_active: boolean;
+  usage_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +18,8 @@ export interface Location {
   name: string;
   description: string | null;
   is_archived: boolean;
+  is_active: boolean;
+  usage_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +29,8 @@ export interface Supplier {
   name: string;
   contact_info: string | null;
   is_archived: boolean;
+  is_active: boolean;
+  usage_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +48,16 @@ export interface Asset {
   supplier_id: number | null;
   created_at: string;
   updated_at: string;
+
+  // New EAM columns
+  purchase_date: string | null;
+  purchase_cost: number | null;
+  invoice_number: string | null;
+  warranty_expiry: string | null;
+  purchase_notes: string | null;
+  photos: string[];
+  notes: string | null;
+  condition: string;
 
   category: AssetCategory;
   location: Location;
@@ -62,10 +78,11 @@ export interface BorrowTransaction {
   borrow_request_id: number;
   issued_by_id: number | null;
   issued_at: string | null;
-  initial_condition: string | null;
+  condition_out: string | null;
   received_by_id: number | null;
   returned_at: string | null;
-  return_condition: string | null;
+  condition_in: string | null;
+  condition_alert: boolean;
   notes: string | null;
   created_at: string;
   updated_at: string;

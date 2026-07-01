@@ -22,7 +22,7 @@ export interface Department {
   name: string;
   description: string | null;
   is_archived: boolean;
+  usage_count?: number;
   created_at: string;
   updated_at: string;
 }
-

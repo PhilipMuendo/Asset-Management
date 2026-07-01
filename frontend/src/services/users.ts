@@ -27,3 +27,23 @@ export function listDepartments() {
   return apiRequest<Department[]>("/departments");
 }
 
+export function createDepartment(payload: { name: string; description?: string }) {
+  return apiRequest<Department>("/departments", {
+    method: "POST",
+    json: payload
+  });
+}
+
+export function updateDepartment(id: number, payload: { name?: string; description?: string }) {
+  return apiRequest<Department>(`/departments/${id}`, {
+    method: "PATCH",
+    json: payload
+  });
+}
+
+export function deleteDepartment(id: number) {
+  return apiRequest<void>(`/departments/${id}`, {
+    method: "DELETE"
+  });
+}
+

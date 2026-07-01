@@ -34,29 +34,22 @@ export function DashboardPage() {
           </p>
         </div>
 
-        {/* Metrics Grid */}
+        {/* EAM Metrics Cards */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard title="Total Registered Assets" value={metrics?.total_assets ?? 0} />
+          <MetricCard title="Total Assets" value={metrics?.total_assets ?? 0} />
+          <MetricCard title="Available Assets" value={distribution?.available ?? 0} className="border-green-200" />
+          <MetricCard title="Reserved Assets" value={distribution?.reserved ?? 0} className="border-blue-200" />
+          <MetricCard title="Borrowed Assets" value={distribution?.borrowed ?? 0} className="border-orange-200" />
+          <MetricCard title="Under Maintenance" value={distribution?.maintenance ?? 0} className="border-purple-200" />
+          <MetricCard title="Lost Assets" value={distribution?.lost ?? 0} className="border-red-200" />
+          <MetricCard title="Damaged Assets" value={distribution?.damaged ?? 0} className="border-red-300" />
+          <MetricCard title="Archived Assets" value={distribution?.archived ?? 0} className="border-slate-200" />
           <MetricCard title="Active Borrows" value={metrics?.active_borrows ?? 0} />
           <MetricCard title="Overdue Borrows" value={metrics?.overdue_borrows ?? 0} className={metrics?.overdue_borrows > 0 ? "border-red-200 bg-red-50/50" : ""} />
           <MetricCard title="Staff Members" value={metrics?.total_users ?? 0} />
         </section>
 
-        {/* Status Distribution */}
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4">Asset Status Distribution</h3>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
-            {distribution &&
-              Object.entries(distribution).map(([status, count]) => (
-                <div key={status} className="border border-slate-100 rounded p-3 text-center">
-                  <Badge value={status} className="mb-2" />
-                  <p className="text-lg font-bold text-slate-900">{count as number}</p>
-                </div>
-              ))}
-          </div>
-        </section>
-
-        {/* Recent Audit Logs */}
+        {/* Recent Audit Timeline */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4">Recent Audit Timeline</h3>
           <div className="flow-root">

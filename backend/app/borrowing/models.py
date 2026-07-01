@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
-from sqlalchemy import ForeignKey, String, Enum, Text, DateTime, func
+from sqlalchemy import ForeignKey, String, Enum, Text, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 from app.database.mixins import TimestampMixin
@@ -63,11 +63,12 @@ class BorrowTransaction(TimestampMixin, Base):
     
     issued_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    initial_condition: Mapped[str | None] = mapped_column(Text)
+    condition_out: Mapped[str | None] = mapped_column(String(40), default="Good")
     
     received_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    return_condition: Mapped[str | None] = mapped_column(Text)
+    condition_in: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    condition_alert: Mapped[bool] = mapped_column(Boolean, default=False)
     
     notes: Mapped[str | None] = mapped_column(Text)
 

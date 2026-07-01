@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, Edit3, Trash2, ShieldAlert, Check, X, ShieldX } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { listCategories, createCategory, listLocations, createLocation, listSuppliers, createSupplier } from "../services/assets";
+import { listCategories, createCategory, updateCategory, deleteCategory, listLocations, createLocation, updateLocation, deleteLocation, listSuppliers, createSupplier, updateSupplier, deleteSupplier } from "../services/assets";
+import { listDepartments, createDepartment, updateDepartment, deleteDepartment } from "../services/users";
 
 const configSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -18,12 +19,15 @@ type ConfigForm = z.infer<typeof configSchema>;
 
 export function ConfigurationsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"categories" | "locations" | "suppliers">("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "locations" | "suppliers" | "departments">("categories");
   const [formOpen, setFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
   const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: listLocations });
   const suppliersQuery = useQuery({ queryKey: ["suppliers"], queryFn: listSuppliers });
+  const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: listDepartments });
 
   const form = useForm<ConfigForm>({
     resolver: zodResolver(configSchema),
@@ -32,66 +36,157 @@ export function ConfigurationsPage() {
 
   const createCategoryMutation = useMutation({
     mutationFn: createCategory,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      resetForm();
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateCategory(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: deleteCategory,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
   });
 
   const createLocationMutation = useMutation({
     mutationFn: createLocation,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["locations"] });
-      resetForm();
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const updateLocationMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateLocation(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const deleteLocationMutation = useMutation({
+    mutationFn: deleteLocation,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
   });
 
   const createSupplierMutation = useMutation({
     mutationFn: createSupplier,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      resetForm();
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const updateSupplierMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateSupplier(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const deleteSupplierMutation = useMutation({
+    mutationFn: deleteSupplier,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const createDepartmentMutation = useMutation({
+    mutationFn: createDepartment,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const updateDepartmentMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateDepartment(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
+  });
+
+  const deleteDepartmentMutation = useMutation({
+    mutationFn: deleteDepartment,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); },
+    onError: (err: any) => setErrorMsg(err.message)
   });
 
   function resetForm() {
-    form.reset();
+    form.reset({ name: "", description: "", contact_info: "" });
     setFormOpen(false);
+    setEditingItem(null);
+    setErrorMsg(null);
+  }
+
+  function handleEditClick(item: any) {
+    setEditingItem(item);
+    form.reset({
+      name: item.name,
+      description: item.description || "",
+      contact_info: item.contact_info || ""
+    });
+    setFormOpen(true);
+    setErrorMsg(null);
   }
 
   async function onSubmit(values: ConfigForm) {
-    if (activeTab === "categories") {
-      await createCategoryMutation.mutateAsync({ name: values.name, description: values.description });
-    } else if (activeTab === "locations") {
-      await createLocationMutation.mutateAsync({ name: values.name, description: values.description });
-    } else if (activeTab === "suppliers") {
-      await createSupplierMutation.mutateAsync({ name: values.name, contact_info: values.contact_info });
-    }
+    setErrorMsg(null);
+    try {
+      if (editingItem) {
+        const data: any = { name: values.name };
+        if (activeTab !== "suppliers") data.description = values.description;
+        else data.contact_info = values.contact_info;
+
+        if (activeTab === "categories") await updateCategoryMutation.mutateAsync({ id: editingItem.id, data });
+        else if (activeTab === "locations") await updateLocationMutation.mutateAsync({ id: editingItem.id, data });
+        else if (activeTab === "suppliers") await updateSupplierMutation.mutateAsync({ id: editingItem.id, data });
+        else if (activeTab === "departments") await updateDepartmentMutation.mutateAsync({ id: editingItem.id, data });
+      } else {
+        if (activeTab === "categories") await createCategoryMutation.mutateAsync({ name: values.name, description: values.description });
+        else if (activeTab === "locations") await createLocationMutation.mutateAsync({ name: values.name, description: values.description });
+        else if (activeTab === "suppliers") await createSupplierMutation.mutateAsync({ name: values.name, contact_info: values.contact_info });
+        else if (activeTab === "departments") await createDepartmentMutation.mutateAsync({ name: values.name, description: values.description });
+      }
+    } catch (err) {}
+  }
+
+  async function toggleActiveStatus(item: any) {
+    setErrorMsg(null);
+    const data = { is_active: !item.is_active };
+    if (activeTab === "categories") await updateCategoryMutation.mutateAsync({ id: item.id, data });
+    else if (activeTab === "locations") await updateLocationMutation.mutateAsync({ id: item.id, data });
+    else if (activeTab === "suppliers") await updateSupplierMutation.mutateAsync({ id: item.id, data });
+  }
+
+  async function handleDelete(id: number) {
+    setErrorMsg(null);
+    if (!window.confirm("Are you sure you want to delete this master record?")) return;
+    try {
+      if (activeTab === "categories") await deleteCategoryMutation.mutateAsync(id);
+      else if (activeTab === "locations") await deleteLocationMutation.mutateAsync(id);
+      else if (activeTab === "suppliers") await deleteSupplierMutation.mutateAsync(id);
+      else if (activeTab === "departments") await deleteDepartmentMutation.mutateAsync(id);
+    } catch (err) {}
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-normal text-slate-950">System Configurations</h1>
+          <h1 className="text-2xl font-semibold tracking-normal text-slate-950">Master Data Configuration</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage asset categories, warehouse locations, and suppliers.
+            Manage asset categories, warehouse storage locations, suppliers, and departments.
           </p>
         </div>
-        <Button onClick={() => setFormOpen((open) => !open)}>
+        <Button onClick={() => { setEditingItem(null); setFormOpen((open) => !open); setErrorMsg(null); }}>
           <Plus size={18} />
-          Add New Item
+          {formOpen ? "Close Panel" : "Add New Item"}
         </Button>
       </div>
 
       <div className="border-b border-slate-200">
         <nav className="flex gap-6" aria-label="Tabs">
-          {(["categories", "locations", "suppliers"] as const).map((tab) => (
+          {(["categories", "locations", "suppliers", "departments"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => {
                 setActiveTab(tab);
-                setFormOpen(false);
+                resetForm();
               }}
               className={`pb-4 text-sm font-medium border-b-2 capitalize transition-colors ${
                 activeTab === tab
@@ -105,8 +200,18 @@ export function ConfigurationsPage() {
         </nav>
       </div>
 
+      {errorMsg && (
+        <div className="rounded-md bg-red-50 p-4 border border-red-200 flex items-center gap-2 text-sm text-red-700">
+          <ShieldX size={16} />
+          {errorMsg}
+        </div>
+      )}
+
       {formOpen && (
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+          <h3 className="text-sm font-bold text-slate-950 mb-3">
+            {editingItem ? `Rename / Edit ${editingItem.name}` : `Create New ${activeTab.slice(0, -1)}`}
+          </h3>
           <form className="space-y-4 max-w-lg" onSubmit={form.handleSubmit(onSubmit)}>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Name</label>
@@ -150,7 +255,11 @@ export function ConfigurationsPage() {
               ) : (
                 <th className="px-6 py-4">Contact Info</th>
               )}
-              <th className="px-6 py-4">Created At</th>
+              {activeTab !== "departments" && (
+                <th className="px-6 py-4">Status</th>
+              )}
+              <th className="px-6 py-4">Assets Linked</th>
+              <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white text-slate-900">
@@ -159,7 +268,27 @@ export function ConfigurationsPage() {
                 <tr key={cat.id}>
                   <td className="px-6 py-4 font-medium">{cat.name}</td>
                   <td className="px-6 py-4 text-slate-500">{cat.description || "—"}</td>
-                  <td className="px-6 py-4 text-slate-500">{new Date(cat.created_at).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => toggleActiveStatus(cat)}
+                      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border ${
+                        cat.is_active
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-slate-100 text-slate-500 border-slate-200"
+                      }`}
+                    >
+                      {cat.is_active ? "Active" : "Inactive"}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-slate-900 font-semibold">{cat.usage_count}</td>
+                  <td className="px-6 py-4 flex gap-2">
+                    <Button variant="ghost" className="p-1" onClick={() => handleEditClick(cat)}>
+                      <Edit3 size={14} />
+                    </Button>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(cat.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </td>
                 </tr>
               ))}
             {activeTab === "locations" &&
@@ -167,7 +296,27 @@ export function ConfigurationsPage() {
                 <tr key={loc.id}>
                   <td className="px-6 py-4 font-medium">{loc.name}</td>
                   <td className="px-6 py-4 text-slate-500">{loc.description || "—"}</td>
-                  <td className="px-6 py-4 text-slate-500">{new Date(loc.created_at).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => toggleActiveStatus(loc)}
+                      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border ${
+                        loc.is_active
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-slate-100 text-slate-500 border-slate-200"
+                      }`}
+                    >
+                      {loc.is_active ? "Active" : "Inactive"}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-slate-900 font-semibold">{loc.usage_count}</td>
+                  <td className="px-6 py-4 flex gap-2">
+                    <Button variant="ghost" className="p-1" onClick={() => handleEditClick(loc)}>
+                      <Edit3 size={14} />
+                    </Button>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(loc.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </td>
                 </tr>
               ))}
             {activeTab === "suppliers" &&
@@ -175,7 +324,43 @@ export function ConfigurationsPage() {
                 <tr key={sup.id}>
                   <td className="px-6 py-4 font-medium">{sup.name}</td>
                   <td className="px-6 py-4 text-slate-500">{sup.contact_info || "—"}</td>
-                  <td className="px-6 py-4 text-slate-500">{new Date(sup.created_at).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => toggleActiveStatus(sup)}
+                      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border ${
+                        sup.is_active
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-slate-100 text-slate-500 border-slate-200"
+                      }`}
+                    >
+                      {sup.is_active ? "Active" : "Inactive"}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-slate-900 font-semibold">{sup.usage_count}</td>
+                  <td className="px-6 py-4 flex gap-2">
+                    <Button variant="ghost" className="p-1" onClick={() => handleEditClick(sup)}>
+                      <Edit3 size={14} />
+                    </Button>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(sup.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            {activeTab === "departments" &&
+              departmentsQuery.data?.map((dept) => (
+                <tr key={dept.id}>
+                  <td className="px-6 py-4 font-medium">{dept.name}</td>
+                  <td className="px-6 py-4 text-slate-500">{dept.description || "—"}</td>
+                  <td className="px-6 py-4 text-slate-900 font-semibold">{dept.usage_count}</td>
+                  <td className="px-6 py-4 flex gap-2">
+                    <Button variant="ghost" className="p-1" onClick={() => handleEditClick(dept)}>
+                      <Edit3 size={14} />
+                    </Button>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(dept.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </td>
                 </tr>
               ))}
           </tbody>

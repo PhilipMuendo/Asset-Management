@@ -246,11 +246,16 @@ def issue_assets(
 
     request.status = BorrowRequestStatus.ISSUED
 
+    # Get condition of the first asset requested (or default to Good)
+    first_asset_condition = "Good"
+    if request.items:
+        first_asset_condition = request.items[0].asset.condition
+
     transaction = BorrowTransaction(
         borrow_request_id=request.id,
         issued_by_id=admin.id,
         issued_at=datetime.now(UTC),
-        initial_condition="Good",
+        condition_out=first_asset_condition,
         notes="Asset collection scanned/approved"
     )
     db.add(transaction)
@@ -280,18 +285,25 @@ def return_assets(
     if request.status not in (BorrowRequestStatus.ISSUED, BorrowRequestStatus.OVERDUE):
         raise HTTPException(status_code=400, detail="Only issued or overdue requests can be returned")
 
-    # Transition assets back to AVAILABLE
+    # Validate condition value from master list
+    valid_conditions = ["Excellent", "Good", "Fair", "Damaged", "Needs Repair"]
+    if payload.return_condition not in valid_conditions:
+        raise HTTPException(status_code=400, detail=f"Invalid condition. Choose from: {', '.join(valid_conditions)}")
+
+    # Transition assets back to AVAILABLE and update condition
     for item in request.items:
         asset = item.asset
         prev = asset.status
+        prev_cond = asset.condition
         asset.status = AssetStatus.AVAILABLE
+        asset.condition = payload.return_condition  # Update asset's current condition
         db.add(AssetHistory(
             asset_id=asset.id,
             user_id=admin.id,
             action="status_change",
             previous_status=prev,
             new_status=AssetStatus.AVAILABLE,
-            notes=f"Returned from Request #{request.id}. Condition: {payload.return_condition}"
+            notes=f"Returned from Request #{request.id}. Condition: {payload.return_condition} (was {prev_cond})"
         ))
 
     request.status = BorrowRequestStatus.RETURNED
@@ -303,8 +315,35 @@ def return_assets(
     if transaction:
         transaction.received_by_id = admin.id
         transaction.returned_at = datetime.now(UTC)
-        transaction.return_condition = payload.return_condition
+        transaction.condition_in = payload.return_condition
         transaction.notes = payload.notes or transaction.notes
+        
+        # Check if condition in is worse than condition out
+        CONDITION_RANKS = {
+            "Excellent": 5,
+            "Good": 4,
+            "Fair": 3,
+            "Damaged": 2,
+            "Needs Repair": 1
+        }
+        out_rank = CONDITION_RANKS.get(transaction.condition_out or "Good", 4)
+        in_rank = CONDITION_RANKS.get(payload.return_condition, 4)
+        if in_rank < out_rank:
+            transaction.condition_alert = True
+            
+            # Notify Admin / Audit alert
+            AuditService(db).record(
+                actor_user_id=admin.id,
+                action="borrow.return_alert",
+                entity_type="borrow_transaction",
+                entity_id=str(transaction.id),
+                metadata={
+                    "request_id": request.id,
+                    "condition_out": transaction.condition_out,
+                    "condition_in": payload.return_condition,
+                    "notes": "Returning condition is worse than checkout condition!"
+                },
+            )
 
     AuditService(db).record(
         actor_user_id=admin.id,

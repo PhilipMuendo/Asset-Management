@@ -24,10 +24,11 @@ class BorrowTransactionRead(BaseModel):
     borrow_request_id: int
     issued_by_id: int | None
     issued_at: datetime | None
-    initial_condition: str | None
+    condition_out: str | None
     received_by_id: int | None
     returned_at: datetime | None
-    return_condition: str | None
+    condition_in: str | None
+    condition_alert: bool
     notes: str | None
     created_at: datetime
     updated_at: datetime
