@@ -51,8 +51,21 @@ def submit_borrow_request(
         entity_id=str(request.id),
         metadata={"assets_count": len(assets)},
     )
+    # Commit the transaction and then reload the request with its related items, user and asset relationships
     db.commit()
-    db.refresh(request)
+    # Reload the request with eager loading of user, items and their assets (including category, location, supplier)
+    from sqlalchemy import select
+    from sqlalchemy.orm import joinedload
+    request = db.scalar(
+        select(BorrowRequest)
+        .where(BorrowRequest.id == request.id)
+        .options(
+            joinedload(BorrowRequest.user),
+            joinedload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.category),
+            joinedload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.location),
+            joinedload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.supplier),
+        )
+    )
     return request
 
 

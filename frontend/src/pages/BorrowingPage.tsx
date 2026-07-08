@@ -56,7 +56,8 @@ export function BorrowingPage() {
   const submitMutation = useMutation({
     mutationFn: submitBorrowRequest,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requests"] });
+      // Invalidate the exact query key used by the request list (includes admin flag)
+      queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       form.reset();
       setFormOpen(false);
@@ -66,7 +67,7 @@ export function BorrowingPage() {
   const approveMutation = useMutation({
     mutationFn: approveBorrowRequest,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requests"] });
+      queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     }
   });
@@ -74,7 +75,7 @@ export function BorrowingPage() {
   const rejectMutation = useMutation({
     mutationFn: rejectBorrowRequest,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requests"] });
+      queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     }
   });
@@ -82,7 +83,7 @@ export function BorrowingPage() {
   const cancelMutation = useMutation({
     mutationFn: cancelBorrowRequest,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requests"] });
+      queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     }
   });
@@ -90,7 +91,7 @@ export function BorrowingPage() {
   const issueMutation = useMutation({
     mutationFn: issueAssets,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requests"] });
+      queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     }
   });
@@ -99,7 +100,7 @@ export function BorrowingPage() {
     mutationFn: ({ id, data }: { id: number; data: { return_condition: string; notes?: string } }) =>
       returnAssets(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requests"] });
+      queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       setReturnRequest(null);
       setReturnCondition("Good");
