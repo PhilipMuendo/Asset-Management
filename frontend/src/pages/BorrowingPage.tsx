@@ -43,9 +43,13 @@ export function BorrowingPage() {
 
   const assetsQuery = useQuery({ queryKey: ["assets"], queryFn: listAssets });
   
+  // Fetch borrow requests only after we know the current user (authentication)
   const requestsQuery = useQuery({
     queryKey: ["requests", isAdmin],
-    queryFn: isAdmin ? listBorrowRequests : listMyBorrowRequests
+    queryFn: isAdmin ? listBorrowRequests : listMyBorrowRequests,
+    // Prevent the query from running before the auth cookie is set.
+    // This avoids an initial 401 which would otherwise block subsequent refetches.
+    enabled: !!user
   });
 
   const form = useForm<RequestForm>({
