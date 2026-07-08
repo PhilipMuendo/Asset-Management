@@ -17,6 +17,10 @@ export interface User {
   updated_at: string;
 }
 
+export interface UserCreateResponse extends User {
+  temporary_password?: string;
+}
+
 export interface Department {
   id: number;
   name: string;

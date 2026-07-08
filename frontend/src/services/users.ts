@@ -1,5 +1,5 @@
 import { apiRequest } from "./api";
-import type { Department, User, UserRole, UserStatus } from "../types/user";
+import type { Department, User, UserCreateResponse, UserRole, UserStatus } from "../types/user";
 
 export interface CreateUserPayload {
   first_name: string;
@@ -10,14 +10,15 @@ export interface CreateUserPayload {
   job_title: string | null;
   role: UserRole;
   status: UserStatus;
+  password?: string;
 }
 
 export function listUsers() {
   return apiRequest<User[]>("/users");
 }
-
+// 
 export function createUser(payload: CreateUserPayload) {
-  return apiRequest<User>("/users", {
+  return apiRequest<UserCreateResponse>("/users", {
     method: "POST",
     json: payload
   });

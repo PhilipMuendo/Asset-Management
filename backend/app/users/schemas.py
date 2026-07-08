@@ -24,6 +24,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Payload for admin-created accounts."""
 
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
 
 class UserUpdate(BaseModel):
     first_name: str | None = Field(default=None, min_length=2, max_length=80)
@@ -51,3 +53,9 @@ class UserRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserCreateResponse(UserRead):
+    """Response for admin-created accounts — includes the one-time temporary password."""
+
+    temporary_password: str | None = None

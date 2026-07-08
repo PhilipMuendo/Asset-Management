@@ -6,7 +6,7 @@ from app.core.security import generate_temporary_password, hash_password
 from app.departments.repository import DepartmentRepository
 from app.users.models import User, UserStatus
 from app.users.repository import UserRepository
-from app.users.schemas import UserCreate, UserUpdate
+from app.users.schemas import UserCreate, UserCreateResponse, UserUpdate
 from app.utils.email import EmailClient, WelcomeEmail
 
 
@@ -17,7 +17,7 @@ class UserService:
         self.departments = DepartmentRepository(db)
         self.audit = AuditService(db)
 
-    def create_user(self, payload: UserCreate, actor: User) -> User:
+    def create_user(self, payload: UserCreate, actor: User) -> tuple[User, str]:
         if self.users.get_by_email(payload.email):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
@@ -26,7 +26,7 @@ class UserService:
             if not department or department.is_archived:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid department")
 
-        temporary_password = generate_temporary_password()
+        temporary_password = payload.password if payload.password else generate_temporary_password()
         user = self.users.add(
             User(
                 first_name=payload.first_name,
@@ -59,7 +59,7 @@ class UserService:
         )
         self.db.commit()
         self.db.refresh(user)
-        return user
+        return user, temporary_password
 
     def update_user(self, user_id: int, payload: UserUpdate, actor: User) -> User:
         user = self.users.get_by_id(user_id)

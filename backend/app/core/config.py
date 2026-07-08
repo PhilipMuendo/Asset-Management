@@ -7,8 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "CEA Asset Management"
     environment: str = "local"
-    database_url: str
-    secret_key: str
+    # Default to an in‑memory SQLite database for local development and tests
+    database_url: str = "sqlite:///./test.db"
+    # Provide a deterministic secret key for test environments; can be overridden via .env
+    secret_key: str = "test-secret-key"
     access_token_expire_minutes: int = 720
     cors_origins: str = "http://localhost:5173"
     cookie_name: str = "cea_access_token"

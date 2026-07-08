@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "../components/ui/Badge";
 import { useAuth } from "../hooks/useAuth";
-import { getDashboardSummary, listMyBorrowRequests } from "../services/borrowing";
+import { getDashboardSummary, listMyBorrowRequests, listBorrowRequests } from "../services/borrowing";
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -19,11 +19,19 @@ export function DashboardPage() {
     enabled: !isAdmin
   });
 
+  // Admin can view all borrow requests
+  const allRequestsQuery = useQuery({
+    queryKey: ["all-requests"],
+    queryFn: listBorrowRequests,
+    enabled: isAdmin
+  });
+
   if (isAdmin) {
     const data = adminSummaryQuery.data;
     const metrics = data?.metrics;
     const distribution = data?.status_distribution;
     const logs = data?.recent_audit_logs;
+    const allRequests = allRequestsQuery.data;
 
     return (
       <div className="space-y-6">
@@ -49,7 +57,7 @@ export function DashboardPage() {
           <MetricCard title="Staff Members" value={metrics?.total_users ?? 0} />
         </section>
 
-        {/* Recent Audit Timeline */}
+          {/* Recent Audit Timeline */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4">Recent Audit Timeline</h3>
           <div className="flow-root">
@@ -84,7 +92,29 @@ export function DashboardPage() {
               {logs?.length === 0 && <p className="text-sm text-slate-400">No logs recorded yet.</p>}
             </ul>
           </div>
-        </section>
+          </section>
+
+          {/* Borrow Requests Overview for Admin */}
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Borrow Requests</h3>
+            <div className="space-y-3">
+              {allRequests?.map((request) => (
+                <div key={request.id} className="border border-slate-100 rounded p-3 flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Request #{request.id}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {request.items.map((i: any) => i.asset.name).join(", ")}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">Expected return: {new Date(request.expected_return_date).toLocaleDateString()}</p>
+                  </div>
+                  <Badge value={request.status} />
+                </div>
+              ))}
+              {allRequests?.length === 0 && (
+                <p className="text-sm text-slate-400">No borrow requests found.</p>
+              )}
+            </div>
+          </section>
       </div>
     );
   }

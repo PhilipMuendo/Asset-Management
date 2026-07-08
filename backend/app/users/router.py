@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db, require_admin
 from app.users.models import User
 from app.users.repository import UserRepository
-from app.users.schemas import UserCreate, UserRead, UserUpdate
+from app.users.schemas import UserCreate, UserCreateResponse, UserRead, UserUpdate
 from app.users.service import UserService
 
 router = APIRouter()
@@ -18,13 +18,16 @@ def list_users(
     return UserRepository(db).list()
 
 
-@router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
-) -> User:
-    return UserService(db).create_user(payload, admin)
+) -> UserCreateResponse:
+    user, temporary_password = UserService(db).create_user(payload, admin)
+    response = UserCreateResponse.model_validate(user)
+    response.temporary_password = temporary_password
+    return response
 
 
 @router.patch("/{user_id}", response_model=UserRead)
