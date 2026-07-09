@@ -18,6 +18,10 @@ def submit_borrow_request(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ) -> BorrowRequest:
+    # Expected return date must be today or in the future
+    if payload.expected_return_date.date() < datetime.now(UTC).date():
+        raise HTTPException(status_code=400, detail="Expected return date cannot be in the past")
+
     # Ensure all assets exist and are AVAILABLE
     assets = []
     for asset_id in payload.asset_ids:
@@ -87,7 +91,7 @@ def list_borrow_requests(
                 joinedload(BorrowRequest.transactions).joinedload(BorrowTransaction.received_by),
             )
             .order_by(BorrowRequest.created_at.desc())
-        )
+        ).unique()
     )
 
 
@@ -110,7 +114,7 @@ def list_my_borrow_requests(
                 joinedload(BorrowRequest.transactions).joinedload(BorrowTransaction.received_by),
             )
             .order_by(BorrowRequest.created_at.desc())
-        )
+        ).unique()
     )
 
 
@@ -299,23 +303,31 @@ def return_assets(
         raise HTTPException(status_code=400, detail="Only issued or overdue requests can be returned")
 
     # Validate condition value from master list
-    valid_conditions = ["Excellent", "Good", "Fair", "Damaged", "Needs Repair"]
+    valid_conditions = ["Excellent", "Good", "Fair", "Damaged", "Needs Repair", "Lost"]
     if payload.return_condition not in valid_conditions:
         raise HTTPException(status_code=400, detail=f"Invalid condition. Choose from: {', '.join(valid_conditions)}")
 
-    # Transition assets back to AVAILABLE and update condition
+    # Transition assets based on return condition
     for item in request.items:
         asset = item.asset
         prev = asset.status
         prev_cond = asset.condition
-        asset.status = AssetStatus.AVAILABLE
+        
+        if payload.return_condition == "Lost":
+            target_status = AssetStatus.LOST
+        elif payload.return_condition in ("Damaged", "Needs Repair"):
+            target_status = AssetStatus.DAMAGED
+        else:
+            target_status = AssetStatus.AVAILABLE
+
+        asset.status = target_status
         asset.condition = payload.return_condition  # Update asset's current condition
         db.add(AssetHistory(
             asset_id=asset.id,
             user_id=admin.id,
             action="status_change",
             previous_status=prev,
-            new_status=AssetStatus.AVAILABLE,
+            new_status=target_status,
             notes=f"Returned from Request #{request.id}. Condition: {payload.return_condition} (was {prev_cond})"
         ))
 

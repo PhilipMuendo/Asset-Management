@@ -237,6 +237,11 @@ export function AssetsPage() {
     printWindow.document.close();
   }
 
+  async function downloadQrPdf(assetId: number) {
+    await triggerReprintAudit(assetId);
+    window.open(`/api/v1/assets/${assetId}/qr-pdf`, "_blank");
+  }
+
   // Filtered assets
   const filteredAssets = assetsQuery.data?.filter((asset) => {
     const matchesSearch =
@@ -491,7 +496,7 @@ export function AssetsPage() {
                 </Button>
               </div>
               <div className="flex gap-2">
-                <Button className="flex-1" variant="secondary" onClick={() => downloadQrPdfLabel(qrAsset.permanent_id, qrAsset.name, qrAsset.id)}>
+                <Button className="flex-1" variant="secondary" onClick={() => downloadQrPdf(qrAsset.id)}>
                   <FileText size={16} />
                   Download PDF
                 </Button>

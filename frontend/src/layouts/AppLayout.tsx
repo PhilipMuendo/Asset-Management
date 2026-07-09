@@ -1,4 +1,4 @@
-import { LogOut, Users, LayoutDashboard, Wrench, ClipboardList, Settings, History } from "lucide-react";
+import { LogOut, Users, LayoutDashboard, Wrench, ClipboardList, Settings, History, Sliders } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
@@ -30,10 +30,11 @@ export function AppLayout() {
           {user?.role === "admin" ? (
             <>
               <NavItem to="/users" icon={<Users size={18} />} label="Staff accounts" />
-              <NavItem to="/admin/configurations" icon={<Settings size={18} />} label="Configurations" />
+              <NavItem to="/admin/configurations" icon={<Sliders size={18} />} label="Configurations" />
               <NavItem to="/audit-logs" icon={<History size={18} />} label="Audit logs" />
             </>
           ) : null}
+          <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" />
         </nav>
       </aside>
 

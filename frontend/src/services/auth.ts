@@ -26,3 +26,11 @@ export function getCurrentUser() {
   return apiRequest<User>("/auth/me");
 }
 
+export function changePassword(payload: any) {
+  return apiRequest<User>("/auth/change-password", {
+    method: "POST",
+    json: payload
+  });
+}
+
+

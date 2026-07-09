@@ -388,6 +388,21 @@ def update_asset(
     
     # Audit changes field by field
     updates = payload.model_dump(exclude_unset=True)
+
+    # Enforce repair restriction
+    if asset.status in (AssetStatus.DAMAGED, AssetStatus.LOST):
+        new_cond = updates.get("condition")
+        new_status = updates.get("status")
+        if new_cond in ("Excellent", "Good", "Fair"):
+            updates["status"] = AssetStatus.AVAILABLE
+        elif new_status == AssetStatus.AVAILABLE:
+            current_cond = new_cond if new_cond is not None else asset.condition
+            if current_cond not in ("Excellent", "Good", "Fair"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only after the item has been repaired can it be made available once more"
+                )
+
     for field, val in updates.items():
         # Prevent mutating permanent_id even if passed
         if field == "permanent_id":
@@ -492,3 +507,73 @@ def record_qr_reprint(
     ))
     db.commit()
     return {"message": "QR reprint audit recorded"}
+
+
+@router.get("/{asset_id}/qr-pdf")
+def get_asset_qr_pdf(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    import io
+    import qrcode
+    from PIL import Image, ImageDraw
+    from fastapi.responses import StreamingResponse
+
+    asset = db.get(Asset, asset_id)
+    if not asset or asset.status == AssetStatus.ARCHIVED:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Generate QR Code image
+    qr = qrcode.QRCode(version=1, box_size=5, border=1)
+    qr.add_data(asset.permanent_id)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+    # Create label canvas (3in x 2in at 150 DPI = 450x300 pixels)
+    img = Image.new("RGB", (450, 300), "white")
+    
+    # Resize QR to fit nicely and paste
+    qr_img_resized = qr_img.resize((160, 160))
+    img.paste(qr_img_resized, (145, 15))
+
+    # Draw label text
+    draw = ImageDraw.Draw(img)
+    
+    # We can draw the text using basic default font since TTF path varies by OS.
+    # We center the text lines at the bottom of the label.
+    id_text = f"ID: {asset.permanent_id}"
+    name_text = asset.name[:35]
+    org_text = "COLLECTIVE ENERGY AFRICA"
+
+    draw.text((225, 200), id_text, fill="black", anchor="mm")
+    draw.text((225, 225), name_text, fill="black", anchor="mm")
+    draw.text((225, 255), org_text, fill="gray", anchor="mm")
+
+    # Save to memory buffer as PDF
+    pdf_buffer = io.BytesIO()
+    img.save(pdf_buffer, format="PDF")
+    pdf_buffer.seek(0)
+
+    # Record audit log
+    AuditService(db).record(
+        actor_user_id=user.id,
+        action="asset.qr_pdf_downloaded",
+        entity_type="asset",
+        entity_id=str(asset.id),
+        metadata={"permanent_id": asset.permanent_id},
+    )
+    db.add(AssetHistory(
+        asset_id=asset.id,
+        user_id=user.id,
+        action="qr_pdf_downloaded",
+        notes="QR code label PDF downloaded"
+    ))
+    db.commit()
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=Label_{asset.permanent_id}.pdf"}
+    )
+

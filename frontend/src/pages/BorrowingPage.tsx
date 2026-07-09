@@ -25,7 +25,13 @@ import { BorrowRequest } from "../types/assets";
 const requestSchema = z.object({
   asset_ids: z.array(z.coerce.number()).min(1, "Select at least one asset"),
   purpose: z.string().min(5, "Purpose must explain why you need the asset"),
-  expected_return_date: z.string().min(1, "Please select an expected return date"),
+  expected_return_date: z.string().min(1, "Please select an expected return date").refine((val) => {
+    const selectedDate = new Date(val);
+    selectedDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate >= today;
+  }, "Expected return date cannot be in the past"),
 });
 
 type RequestForm = z.infer<typeof requestSchema>;
@@ -40,6 +46,7 @@ export function BorrowingPage() {
   const [returnRequest, setReturnRequest] = useState<BorrowRequest | null>(null);
   const [returnCondition, setReturnCondition] = useState("Good");
   const [returnNotes, setReturnNotes] = useState("");
+  const [assetSearch, setAssetSearch] = useState("");
 
   const assetsQuery = useQuery({ queryKey: ["assets"], queryFn: listAssets });
   
@@ -54,7 +61,8 @@ export function BorrowingPage() {
 
   const form = useForm<RequestForm>({
     resolver: zodResolver(requestSchema),
-    defaultValues: { asset_ids: [], purpose: "", expected_return_date: "" }
+    defaultValues: { asset_ids: [], purpose: "", expected_return_date: "" },
+    mode: "onChange"
   });
 
   const submitMutation = useMutation({
@@ -155,20 +163,38 @@ export function BorrowingPage() {
           <form className="space-y-4 max-w-lg" onSubmit={form.handleSubmit(onSubmit)}>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Select Asset(s)</label>
+              <Input
+                placeholder="Search available assets..."
+                className="my-1.5 text-xs"
+                value={assetSearch}
+                onChange={(e) => setAssetSearch(e.target.value)}
+              />
               <div className="mt-1.5 grid gap-2 max-h-48 overflow-y-auto border border-slate-200 p-2.5 rounded">
-                {assetsQuery.data?.filter(a => a.status === "available").map((asset) => (
-                  <label key={asset.id} className="flex items-center gap-2 text-sm text-slate-950 font-medium">
-                    <input
-                      type="checkbox"
-                      value={asset.id}
-                      {...form.register("asset_ids")}
-                      className="rounded border-slate-300 text-brand focus:ring-brand"
-                    />
-                    {asset.name} ({asset.permanent_id})
-                  </label>
-                ))}
-                {assetsQuery.data?.filter(a => a.status === "available").length === 0 && (
-                  <p className="text-sm text-slate-400">No assets are currently available for borrowing.</p>
+                {assetsQuery.data
+                  ?.filter(
+                    (a) =>
+                      a.status === "available" &&
+                      (a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
+                        a.permanent_id.toLowerCase().includes(assetSearch.toLowerCase()))
+                  )
+                  .map((asset) => (
+                    <label key={asset.id} className="flex items-center gap-2 text-sm text-slate-950 font-medium">
+                      <input
+                        type="checkbox"
+                        value={asset.id}
+                        {...form.register("asset_ids")}
+                        className="rounded border-slate-300 text-brand focus:ring-brand"
+                      />
+                      {asset.name} ({asset.permanent_id})
+                    </label>
+                  ))}
+                {assetsQuery.data?.filter(
+                  (a) =>
+                    a.status === "available" &&
+                    (a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
+                      a.permanent_id.toLowerCase().includes(assetSearch.toLowerCase()))
+                ).length === 0 && (
+                  <p className="text-sm text-slate-400">No matching available assets found.</p>
                 )}
               </div>
               {form.formState.errors.asset_ids && (
@@ -186,7 +212,7 @@ export function BorrowingPage() {
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Expected Return Date</label>
-              <Input type="date" className="mt-1.5" {...form.register("expected_return_date")} />
+              <Input type="date" min={new Date().toISOString().split("T")[0]} className="mt-1.5" {...form.register("expected_return_date")} />
               {form.formState.errors.expected_return_date && (
                 <p className="mt-1.5 text-xs text-red-600">{form.formState.errors.expected_return_date.message}</p>
               )}

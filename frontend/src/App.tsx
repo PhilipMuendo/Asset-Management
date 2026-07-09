@@ -8,6 +8,7 @@ import { AssetsPage } from "./pages/AssetsPage";
 import { BorrowingPage } from "./pages/BorrowingPage";
 import { ConfigurationsPage } from "./pages/ConfigurationsPage";
 import { AuditLogsPage } from "./pages/AuditLogsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/admin/configurations" element={<ConfigurationsPage />} />
           <Route path="/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
