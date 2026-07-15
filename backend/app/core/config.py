@@ -1,7 +1,7 @@
 from functools import lru_cache
 import json
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEV_ENVIRONMENTS = {"local", "test"}
@@ -38,6 +38,17 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_postgres_driver(cls, value: str) -> str:
+        # Managed Postgres providers (Render, Heroku, etc.) hand out bare
+        # postgres:// / postgresql:// URLs, which SQLAlchemy defaults to the
+        # psycopg2 driver -- but this project only installs psycopg (v3).
+        for bare_scheme in ("postgres://", "postgresql://"):
+            if value.startswith(bare_scheme):
+                return "postgresql+psycopg://" + value[len(bare_scheme):]
+        return value
 
     @property
     def cors_origin_list(self) -> list[str]:
