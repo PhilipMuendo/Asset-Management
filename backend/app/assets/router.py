@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.audit.service import AuditService
@@ -20,10 +20,9 @@ router = APIRouter()
 @router.get("/categories", response_model=list[CategoryRead])
 def list_categories(db: Session = Depends(get_db)) -> list[AssetCategory]:
     items = CategoryRepository(db).list_active()
+    counts = AssetRepository(db).usage_counts_by(Asset.category_id)
     for item in items:
-        item.usage_count = db.scalar(
-            select(func.count(Asset.id)).where(Asset.category_id == item.id, Asset.status != AssetStatus.ARCHIVED)
-        ) or 0
+        item.usage_count = counts.get(item.id, 0)
     return items
 
 @router.post("/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
@@ -114,10 +113,9 @@ def delete_category(
 @router.get("/locations", response_model=list[LocationRead])
 def list_locations(db: Session = Depends(get_db)) -> list[Location]:
     items = LocationRepository(db).list_active()
+    counts = AssetRepository(db).usage_counts_by(Asset.location_id)
     for item in items:
-        item.usage_count = db.scalar(
-            select(func.count(Asset.id)).where(Asset.location_id == item.id, Asset.status != AssetStatus.ARCHIVED)
-        ) or 0
+        item.usage_count = counts.get(item.id, 0)
     return items
 
 @router.post("/locations", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
@@ -208,10 +206,9 @@ def delete_location(
 @router.get("/suppliers", response_model=list[SupplierRead])
 def list_suppliers(db: Session = Depends(get_db)) -> list[Supplier]:
     items = SupplierRepository(db).list_active()
+    counts = AssetRepository(db).usage_counts_by(Asset.supplier_id)
     for item in items:
-        item.usage_count = db.scalar(
-            select(func.count(Asset.id)).where(Asset.supplier_id == item.id, Asset.status != AssetStatus.ARCHIVED)
-        ) or 0
+        item.usage_count = counts.get(item.id, 0)
     return items
 
 @router.post("/suppliers", response_model=SupplierRead, status_code=status.HTTP_201_CREATED)
@@ -302,9 +299,13 @@ def delete_supplier(
 @router.get("", response_model=list[AssetRead])
 def list_assets(
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    # Frontend currently fetches the full catalog for client-side search; this is a
+    # safety cap against unbounded scans, not real pagination yet (see Phase 2 UI work).
+    limit: int = Query(2000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
 ) -> list[Asset]:
-    return AssetRepository(db).list_active()
+    return AssetRepository(db).list_active(limit=limit, offset=offset)
 
 @router.get("/{asset_id}", response_model=AssetRead)
 def get_asset(

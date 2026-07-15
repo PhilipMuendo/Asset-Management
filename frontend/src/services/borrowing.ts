@@ -58,6 +58,10 @@ export async function getDashboardSummary(): Promise<any> {
   return apiRequest<any>("/reports/dashboard");
 }
 
-export async function getAllAuditLogs(): Promise<AuditLog[]> {
-  return apiRequest<AuditLog[]>("/reports/audit-logs");
+export async function getAllAuditLogs(params: { limit?: number; offset?: number } = {}): Promise<AuditLog[]> {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiRequest<AuditLog[]>(`/reports/audit-logs${suffix}`);
 }

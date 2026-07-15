@@ -19,10 +19,12 @@ export function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/assets" element={<AssetsPage />} />
           <Route path="/borrowing" element={<BorrowingPage />} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/admin/configurations" element={<ConfigurationsPage />} />
-          <Route path="/audit-logs" element={<AuditLogsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route element={<ProtectedRoute roles={["admin"]} />}>
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/admin/configurations" element={<ConfigurationsPage />} />
+            <Route path="/audit-logs" element={<AuditLogsPage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

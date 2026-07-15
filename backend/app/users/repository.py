@@ -14,8 +14,12 @@ class UserRepository:
     def get_by_email(self, email: str) -> User | None:
         return self.db.scalar(select(User).where(User.email == email.lower()))
 
-    def list(self) -> list[User]:
-        return list(self.db.scalars(select(User).order_by(User.created_at.desc())))
+    def list(self, limit: int = 2000, offset: int = 0) -> list[User]:
+        return list(
+            self.db.scalars(
+                select(User).order_by(User.created_at.desc()).limit(limit).offset(offset)
+            )
+        )
 
     def add(self, user: User) -> User:
         self.db.add(user)

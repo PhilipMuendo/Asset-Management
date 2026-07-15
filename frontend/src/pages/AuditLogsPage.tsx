@@ -1,8 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAllAuditLogs } from "../services/borrowing";
 
+const PAGE_SIZE = 50;
+
 export function AuditLogsPage() {
-  const auditLogsQuery = useQuery({ queryKey: ["audit-logs"], queryFn: getAllAuditLogs });
+  const [page, setPage] = useState(0);
+  const auditLogsQuery = useQuery({
+    queryKey: ["audit-logs", page],
+    queryFn: () => getAllAuditLogs({ limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
+    placeholderData: (previous) => previous
+  });
+  const hasNextPage = (auditLogsQuery.data?.length ?? 0) === PAGE_SIZE;
 
   return (
     <div className="space-y-6">
@@ -57,6 +66,28 @@ export function AuditLogsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-slate-500">
+        <span>Page {page + 1}</span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="rounded border border-slate-200 px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={!hasNextPage}
+            className="rounded border border-slate-200 px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );

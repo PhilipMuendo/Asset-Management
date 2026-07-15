@@ -7,7 +7,7 @@ from app.core.dependencies import get_db, require_admin
 from app.departments.models import Department
 from app.departments.repository import DepartmentRepository
 from app.departments.schemas import DepartmentCreate, DepartmentRead, DepartmentUpdate
-from app.users.models import User
+from app.users.models import User, UserStatus
 
 router = APIRouter()
 
@@ -15,10 +15,15 @@ router = APIRouter()
 @router.get("", response_model=list[DepartmentRead])
 def list_departments(db: Session = Depends(get_db)) -> list[Department]:
     items = DepartmentRepository(db).list_active()
+    counts = dict(
+        db.execute(
+            select(User.department_id, func.count(User.id))
+            .where(User.status != UserStatus.ARCHIVED, User.department_id.is_not(None))
+            .group_by(User.department_id)
+        ).all()
+    )
     for item in items:
-        item.usage_count = db.scalar(
-            select(func.count(User.id)).where(User.department_id == item.id, User.status != "archived")
-        ) or 0
+        item.usage_count = counts.get(item.id, 0)
     return items
 
 
@@ -91,7 +96,7 @@ def delete_department(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
 
     usage_count = db.scalar(
-        select(func.count(User.id)).where(User.department_id == department_id, User.status != "archived")
+        select(func.count(User.id)).where(User.department_id == department_id, User.status != UserStatus.ARCHIVED)
     ) or 0
     if usage_count > 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Departments with linked users cannot be deleted")

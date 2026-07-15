@@ -1,7 +1,11 @@
 from functools import lru_cache
 import json
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEV_ENVIRONMENTS = {"local", "test"}
+_INSECURE_DEFAULT_SECRET_KEY = "test-secret-key"
 
 
 class Settings(BaseSettings):
@@ -9,8 +13,8 @@ class Settings(BaseSettings):
     environment: str = "local"
     # Default to an in‑memory SQLite database for local development and tests
     database_url: str = "sqlite:///./test.db"
-    # Provide a deterministic secret key for test environments; can be overridden via .env
-    secret_key: str = "test-secret-key"
+    # Only valid outside local/test environments if explicitly overridden via .env / SECRET_KEY
+    secret_key: str = _INSECURE_DEFAULT_SECRET_KEY
     access_token_expire_minutes: int = 720
     cors_origins: str = "http://localhost:5173"
     cookie_name: str = "cea_access_token"
@@ -46,6 +50,15 @@ class Settings(BaseSettings):
                 raise ValueError("CORS_ORIGINS JSON value must be a list of strings")
             return parsed
         return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def _require_real_secret_key_outside_dev(self) -> "Settings":
+        if self.environment not in _DEV_ENVIRONMENTS and self.secret_key == _INSECURE_DEFAULT_SECRET_KEY:
+            raise ValueError(
+                "SECRET_KEY must be set via environment/.env when ENVIRONMENT is not "
+                f"one of {sorted(_DEV_ENVIRONMENTS)}. Refusing to start with the insecure default."
+            )
+        return self
 
 
 @lru_cache

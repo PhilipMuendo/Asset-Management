@@ -1,15 +1,38 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload
 from app.core.dependencies import get_db, require_admin
 from app.assets.models import Asset, AssetCategory, AssetStatus, Location, Supplier
 from app.borrowing.models import BorrowRequest, BorrowRequestStatus
-from app.users.models import User
+from app.users.models import User, UserStatus
 from app.departments.models import Department
 from app.audit.models import AuditLog
 from typing import Any
 
 router = APIRouter()
+
+
+def _serialize_audit_logs(db: Session, logs: list[AuditLog]) -> list[dict[str, Any]]:
+    actor_ids = {log.actor_user_id for log in logs if log.actor_user_id}
+    actors = (
+        {user.id: user for user in db.scalars(select(User).where(User.id.in_(actor_ids)))}
+        if actor_ids
+        else {}
+    )
+    serialized = []
+    for log in logs:
+        actor = actors.get(log.actor_user_id)
+        serialized.append({
+            "id": log.id,
+            "actor_name": actor.full_name if actor else "System",
+            "actor_email": actor.email if actor else None,
+            "action": log.action,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "metadata": log.metadata_,
+            "created_at": log.created_at,
+        })
+    return serialized
 
 @router.get("/dashboard", response_model=dict[str, Any])
 def get_dashboard_summary(
@@ -18,7 +41,7 @@ def get_dashboard_summary(
 ) -> dict[str, Any]:
     # Counts
     total_assets = db.scalar(select(func.count(Asset.id)).where(Asset.status != AssetStatus.ARCHIVED)) or 0
-    total_users = db.scalar(select(func.count(User.id)).where(User.status != "archived")) or 0
+    total_users = db.scalar(select(func.count(User.id)).where(User.status != UserStatus.ARCHIVED)) or 0
     total_departments = db.scalar(select(func.count(Department.id)).where(Department.is_archived.is_(False))) or 0
     total_categories = db.scalar(select(func.count(AssetCategory.id)).where(AssetCategory.is_archived.is_(False))) or 0
     
@@ -57,19 +80,7 @@ def get_dashboard_summary(
         )
     )
     
-    recent_logs_serialized = []
-    for log in recent_logs:
-        actor = db.get(User, log.actor_user_id) if log.actor_user_id else None
-        recent_logs_serialized.append({
-            "id": log.id,
-            "actor_name": actor.full_name if actor else "System",
-            "actor_email": actor.email if actor else None,
-            "action": log.action,
-            "entity_type": log.entity_type,
-            "entity_id": log.entity_id,
-            "metadata": log.metadata_,
-            "created_at": log.created_at
-        })
+    recent_logs_serialized = _serialize_audit_logs(db, recent_logs)
 
     return {
         "metrics": {
@@ -88,25 +99,16 @@ def get_dashboard_summary(
 @router.get("/audit-logs", response_model=list[dict[str, Any]])
 def get_all_audit_logs(
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
 ) -> list[dict[str, Any]]:
     logs = list(
         db.scalars(
             select(AuditLog)
             .order_by(AuditLog.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
     )
-    serialized = []
-    for log in logs:
-        actor = db.get(User, log.actor_user_id) if log.actor_user_id else None
-        serialized.append({
-            "id": log.id,
-            "actor_name": actor.full_name if actor else "System",
-            "actor_email": actor.email if actor else None,
-            "action": log.action,
-            "entity_type": log.entity_type,
-            "entity_id": log.entity_id,
-            "metadata": log.metadata_,
-            "created_at": log.created_at
-        })
-    return serialized
+    return _serialize_audit_logs(db, logs)

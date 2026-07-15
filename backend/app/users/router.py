@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_admin
@@ -14,8 +14,10 @@ router = APIRouter()
 def list_users(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
+    limit: int = Query(2000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
 ) -> list[User]:
-    return UserRepository(db).list()
+    return UserRepository(db).list(limit=limit, offset=offset)
 
 
 @router.post("", response_model=UserCreateResponse, status_code=status.HTTP_201_CREATED)

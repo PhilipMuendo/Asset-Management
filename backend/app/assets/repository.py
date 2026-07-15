@@ -1,96 +1,50 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, select
+from sqlalchemy.orm import InstrumentedAttribute, Session, joinedload
+
 from app.assets.models import AssetCategory, Location, Supplier, Asset, AssetHistory, AssetStatus
-
-class CategoryRepository:
-    def __init__(self, db: Session) -> None:
-        self.db = db
-
-    def list_active(self) -> list[AssetCategory]:
-        return list(
-            self.db.scalars(
-                select(AssetCategory)
-                .where(AssetCategory.is_archived.is_(False))
-                .order_by(AssetCategory.name.asc())
-            )
-        )
-
-    def get_by_id(self, category_id: int) -> AssetCategory | None:
-        return self.db.get(AssetCategory, category_id)
-
-    def get_by_name(self, name: str) -> AssetCategory | None:
-        return self.db.scalar(select(AssetCategory).where(AssetCategory.name == name))
-
-    def add(self, category: AssetCategory) -> AssetCategory:
-        self.db.add(category)
-        return category
+from app.core.reference_data import ReferenceDataRepository
 
 
-class LocationRepository:
-    def __init__(self, db: Session) -> None:
-        self.db = db
-
-    def list_active(self) -> list[Location]:
-        return list(
-            self.db.scalars(
-                select(Location)
-                .where(Location.is_archived.is_(False))
-                .order_by(Location.name.asc())
-            )
-        )
-
-    def get_by_id(self, location_id: int) -> Location | None:
-        return self.db.get(Location, location_id)
-
-    def get_by_name(self, name: str) -> Location | None:
-        return self.db.scalar(select(Location).where(Location.name == name))
-
-    def add(self, location: Location) -> Location:
-        self.db.add(location)
-        return location
+def CategoryRepository(db: Session) -> ReferenceDataRepository[AssetCategory]:
+    return ReferenceDataRepository(db, AssetCategory)
 
 
-class SupplierRepository:
-    def __init__(self, db: Session) -> None:
-        self.db = db
+def LocationRepository(db: Session) -> ReferenceDataRepository[Location]:
+    return ReferenceDataRepository(db, Location)
 
-    def list_active(self) -> list[Supplier]:
-        return list(
-            self.db.scalars(
-                select(Supplier)
-                .where(Supplier.is_archived.is_(False))
-                .order_by(Supplier.name.asc())
-            )
-        )
 
-    def get_by_id(self, supplier_id: int) -> Supplier | None:
-        return self.db.get(Supplier, supplier_id)
-
-    def get_by_name(self, name: str) -> Supplier | None:
-        return self.db.scalar(select(Supplier).where(Supplier.name == name))
-
-    def add(self, supplier: Supplier) -> Supplier:
-        self.db.add(supplier)
-        return supplier
+def SupplierRepository(db: Session) -> ReferenceDataRepository[Supplier]:
+    return ReferenceDataRepository(db, Supplier)
 
 
 class AssetRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def list_active(self) -> list[Asset]:
-        return list(
-            self.db.scalars(
-                select(Asset)
-                .where(Asset.status != AssetStatus.ARCHIVED)
-                .options(
-                    joinedload(Asset.category),
-                    joinedload(Asset.location),
-                    joinedload(Asset.supplier),
-                )
-                .order_by(Asset.permanent_id.asc())
+    def list_active(self, limit: int | None = None, offset: int = 0) -> list[Asset]:
+        query = (
+            select(Asset)
+            .where(Asset.status != AssetStatus.ARCHIVED)
+            .options(
+                joinedload(Asset.category),
+                joinedload(Asset.location),
+                joinedload(Asset.supplier),
             )
+            .order_by(Asset.permanent_id.asc())
+            .offset(offset)
         )
+        if limit is not None:
+            query = query.limit(limit)
+        return list(self.db.scalars(query))
+
+    def usage_counts_by(self, fk_column: InstrumentedAttribute) -> dict[int, int]:
+        """Single grouped query, e.g. counts of non-archived assets per category_id."""
+        rows = self.db.execute(
+            select(fk_column, func.count(Asset.id))
+            .where(Asset.status != AssetStatus.ARCHIVED, fk_column.is_not(None))
+            .group_by(fk_column)
+        ).all()
+        return {fk_value: count for fk_value, count in rows}
 
     def get_by_id(self, asset_id: int) -> Asset | None:
         return self.db.get(Asset, asset_id)
