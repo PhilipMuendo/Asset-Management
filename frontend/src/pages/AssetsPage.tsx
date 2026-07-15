@@ -6,8 +6,13 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { EmptyState } from "../components/ui/EmptyState";
 import { Input } from "../components/ui/Input";
+import { Pagination } from "../components/ui/Pagination";
 import { Select } from "../components/ui/Select";
+import { SkeletonCard } from "../components/ui/Skeleton";
+import { useToast } from "../components/ui/Toast";
 import { useAuth } from "../hooks/useAuth";
 import {
   listAssets,
@@ -45,9 +50,12 @@ const assetSchema = z.object({
 
 type AssetForm = z.infer<typeof assetSchema>;
 
+const PAGE_SIZE = 12;
+
 export function AssetsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { show: showToast } = useToast();
   const isAdmin = user?.role === "admin";
 
   const [formOpen, setFormOpen] = useState(false);
@@ -55,9 +63,11 @@ export function AssetsPage() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [historyAsset, setHistoryAsset] = useState<Asset | null>(null);
   const [qrAsset, setQrAsset] = useState<Asset | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Asset | null>(null);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [page, setPage] = useState(0);
 
   const assetsQuery = useQuery({ queryKey: ["assets"], queryFn: listAssets });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
@@ -89,7 +99,9 @@ export function AssetsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       resetAssetForm();
-    }
+      showToast("Asset registered successfully");
+    },
+    onError: (err: any) => showToast(err?.message || "Could not register asset", "error")
   });
 
   const updateMutation = useMutation({
@@ -97,7 +109,9 @@ export function AssetsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       resetAssetForm();
-    }
+      showToast("Asset updated successfully");
+    },
+    onError: (err: any) => showToast(err?.message || "Could not update asset", "error")
   });
 
   const archiveMutation = useMutation({
@@ -105,6 +119,12 @@ export function AssetsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       setSelectedAsset(null);
+      setArchiveTarget(null);
+      showToast("Asset archived successfully");
+    },
+    onError: (err: any) => {
+      setArchiveTarget(null);
+      showToast(err?.message || "Could not archive asset", "error");
     }
   });
 
@@ -255,6 +275,9 @@ export function AssetsPage() {
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
+
+  const pagedAssets = filteredAssets?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const hasNextPage = (filteredAssets?.length ?? 0) > (page + 1) * PAGE_SIZE;
 
   return (
     <div className="space-y-6">
@@ -417,16 +440,16 @@ export function AssetsPage() {
             placeholder="Search by ID, Name, Serial, Category, Supplier, Location..."
             className="pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
           />
         </div>
-        <Select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+        <Select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setPage(0); }}>
           <option value="">All Categories</option>
           {categoriesQuery.data?.map((cat) => (
             <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </Select>
-        <Select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+        <Select value={selectedStatus} onChange={(e) => { setSelectedStatus(e.target.value); setPage(0); }}>
           <option value="">All Statuses</option>
           <option value="available">Available</option>
           <option value="reserved">Reserved</option>
@@ -438,8 +461,20 @@ export function AssetsPage() {
       </section>
 
       {/* Assets Grid */}
+      {assetsQuery.isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      ) : filteredAssets?.length === 0 ? (
+        <EmptyState
+          title="No assets match your filters"
+          description="Try adjusting your search term, category, or status filter."
+        />
+      ) : (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredAssets?.map((asset) => (
+        {pagedAssets?.map((asset) => (
           <div key={asset.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft hover:shadow-md transition-shadow flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
@@ -470,6 +505,11 @@ export function AssetsPage() {
           </div>
         ))}
       </div>
+      )}
+
+      {!assetsQuery.isLoading && (filteredAssets?.length ?? 0) > PAGE_SIZE && (
+        <Pagination page={page} hasNextPage={hasNextPage} onPrev={() => setPage((p) => Math.max(0, p - 1))} onNext={() => setPage((p) => p + 1)} />
+      )}
 
       {/* QR Code Dialog */}
       {qrAsset && (
@@ -607,7 +647,7 @@ export function AssetsPage() {
                   <Button variant="secondary" onClick={() => handleEditClick(selectedAsset)}>
                     Edit Asset
                   </Button>
-                  <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => archiveMutation.mutate(selectedAsset.id)}>
+                  <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setArchiveTarget(selectedAsset)}>
                     Archive Asset
                   </Button>
                 </>
@@ -617,6 +657,16 @@ export function AssetsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!archiveTarget}
+        title="Archive this asset?"
+        description={archiveTarget ? `"${archiveTarget.name}" (${archiveTarget.permanent_id}) will be archived and hidden from the active directory.` : undefined}
+        confirmLabel="Archive"
+        variant="danger"
+        onConfirm={() => archiveTarget && archiveMutation.mutate(archiveTarget.id)}
+        onCancel={() => setArchiveTarget(null)}
+      />
     </div>
   );
 }

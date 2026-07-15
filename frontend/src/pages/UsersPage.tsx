@@ -1,14 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Plus } from "lucide-react";
+import { Check, Copy, Plus, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
 import { Input } from "../components/ui/Input";
+import { Pagination } from "../components/ui/Pagination";
 import { Select } from "../components/ui/Select";
+import { SkeletonRow } from "../components/ui/Skeleton";
+import { useToast } from "../components/ui/Toast";
 import { createUser, listDepartments, listUsers } from "../services/users";
 
 const schema = z.object({
@@ -25,11 +29,16 @@ const schema = z.object({
 
 type UserForm = z.infer<typeof schema>;
 
+const PAGE_SIZE = 10;
+
 export function UsersPage() {
   const queryClient = useQueryClient();
+  const { show: showToast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const usersQuery = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: listDepartments });
   const form = useForm<UserForm>({
@@ -51,6 +60,7 @@ export function UsersPage() {
     mutationFn: createUser,
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
+      showToast("Staff account created");
       if (data.temporary_password) {
         setCreatedPassword(data.temporary_password);
       } else {
@@ -82,6 +92,14 @@ export function UsersPage() {
       setCopied(true);
     }
   }
+
+  const filteredUsers = usersQuery.data?.filter(
+    (user) =>
+      `${user.first_name} ${user.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
+      user.email.toLowerCase().includes(search.toLowerCase())
+  );
+  const pagedUsers = filteredUsers?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const hasNextPage = (filteredUsers?.length ?? 0) > (page + 1) * PAGE_SIZE;
 
   return (
     <div className="space-y-6">
@@ -162,6 +180,16 @@ export function UsersPage() {
         </section>
       ) : null}
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <Input
+          placeholder="Search by name or email..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+        />
+      </div>
+
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
@@ -175,7 +203,9 @@ export function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {usersQuery.data?.map((user) => (
+              {usersQuery.isLoading &&
+                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} columns={5} />)}
+              {pagedUsers?.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 font-medium text-slate-900">
                     {user.first_name} {user.last_name}
@@ -195,7 +225,14 @@ export function UsersPage() {
             </tbody>
           </table>
         </div>
+        {!usersQuery.isLoading && filteredUsers?.length === 0 && (
+          <EmptyState title="No staff accounts match your search" />
+        )}
       </section>
+
+      {!usersQuery.isLoading && (filteredUsers?.length ?? 0) > PAGE_SIZE && (
+        <Pagination page={page} hasNextPage={hasNextPage} onPrev={() => setPage((p) => Math.max(0, p - 1))} onNext={() => setPage((p) => p + 1)} />
+      )}
 
       {createdPassword ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">

@@ -60,6 +60,15 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _require_secure_cookie_outside_dev(self) -> "Settings":
+        if self.environment not in _DEV_ENVIRONMENTS and not self.cookie_secure:
+            raise ValueError(
+                "COOKIE_SECURE must be set to true via environment/.env when ENVIRONMENT is not "
+                f"one of {sorted(_DEV_ENVIRONMENTS)}. Refusing to start with auth cookies sent over HTTP."
+            )
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:

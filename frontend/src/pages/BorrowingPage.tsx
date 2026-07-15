@@ -6,8 +6,12 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { EmptyState } from "../components/ui/EmptyState";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
+import { Skeleton } from "../components/ui/Skeleton";
+import { useToast } from "../components/ui/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { listAssets } from "../services/assets";
 import {
@@ -39,6 +43,7 @@ type RequestForm = z.infer<typeof requestSchema>;
 export function BorrowingPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { show: showToast } = useToast();
   const isAdmin = user?.role === "admin";
 
   const [formOpen, setFormOpen] = useState(false);
@@ -47,6 +52,8 @@ export function BorrowingPage() {
   const [returnCondition, setReturnCondition] = useState("Good");
   const [returnNotes, setReturnNotes] = useState("");
   const [assetSearch, setAssetSearch] = useState("");
+  const [rejectTarget, setRejectTarget] = useState<BorrowRequest | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<BorrowRequest | null>(null);
 
   const assetsQuery = useQuery({ queryKey: ["assets"], queryFn: listAssets });
   
@@ -73,7 +80,9 @@ export function BorrowingPage() {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       form.reset();
       setFormOpen(false);
-    }
+      showToast("Borrow request submitted");
+    },
+    onError: (err: any) => showToast(err?.message || "Could not submit request", "error")
   });
 
   const approveMutation = useMutation({
@@ -81,7 +90,9 @@ export function BorrowingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
-    }
+      showToast("Request approved");
+    },
+    onError: (err: any) => showToast(err?.message || "Could not approve request", "error")
   });
 
   const rejectMutation = useMutation({
@@ -89,6 +100,12 @@ export function BorrowingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
+      setRejectTarget(null);
+      showToast("Request rejected");
+    },
+    onError: (err: any) => {
+      setRejectTarget(null);
+      showToast(err?.message || "Could not reject request", "error");
     }
   });
 
@@ -97,6 +114,12 @@ export function BorrowingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
+      setCancelTarget(null);
+      showToast("Request cancelled");
+    },
+    onError: (err: any) => {
+      setCancelTarget(null);
+      showToast(err?.message || "Could not cancel request", "error");
     }
   });
 
@@ -105,7 +128,9 @@ export function BorrowingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests", isAdmin] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
-    }
+      showToast("Assets issued");
+    },
+    onError: (err: any) => showToast(err?.message || "Could not issue assets", "error")
   });
 
   const returnMutation = useMutation({
@@ -117,7 +142,9 @@ export function BorrowingPage() {
       setReturnRequest(null);
       setReturnCondition("Good");
       setReturnNotes("");
-    }
+      showToast("Assets received and recorded");
+    },
+    onError: (err: any) => showToast(err?.message || "Could not complete return", "error")
   });
 
   async function onSubmit(values: RequestForm) {
@@ -162,13 +189,51 @@ export function BorrowingPage() {
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <form className="space-y-4 max-w-lg" onSubmit={form.handleSubmit(onSubmit)}>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Select Asset(s)</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Select Asset(s)</label>
+                <span className="text-xs font-medium text-slate-500">
+                  {(form.watch("asset_ids")?.length ?? 0)} selected
+                </span>
+              </div>
               <Input
                 placeholder="Search available assets..."
                 className="my-1.5 text-xs"
                 value={assetSearch}
                 onChange={(e) => setAssetSearch(e.target.value)}
               />
+              {(() => {
+                const visibleAssets = assetsQuery.data?.filter(
+                  (a) =>
+                    a.status === "available" &&
+                    (a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
+                      a.permanent_id.toLowerCase().includes(assetSearch.toLowerCase()))
+                ) ?? [];
+                const selectedIds = form.watch("asset_ids") ?? [];
+                const allVisibleSelected = visibleAssets.length > 0 && visibleAssets.every((a) => selectedIds.includes(a.id));
+                return visibleAssets.length > 0 ? (
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-500 mt-1.5">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={(e) => {
+                        const visibleIds = visibleAssets.map((a) => a.id);
+                        if (e.target.checked) {
+                          const merged = Array.from(new Set([...selectedIds, ...visibleIds]));
+                          form.setValue("asset_ids", merged, { shouldValidate: true });
+                        } else {
+                          form.setValue(
+                            "asset_ids",
+                            selectedIds.filter((id) => !visibleIds.includes(id)),
+                            { shouldValidate: true }
+                          );
+                        }
+                      }}
+                      className="rounded border-slate-300 text-brand focus:ring-brand"
+                    />
+                    Select all visible
+                  </label>
+                ) : null;
+              })()}
               <div className="mt-1.5 grid gap-2 max-h-48 overflow-y-auto border border-slate-200 p-2.5 rounded">
                 {assetsQuery.data
                   ?.filter(
@@ -295,7 +360,7 @@ export function BorrowingPage() {
                     <Check size={14} />
                     Approve
                   </Button>
-                  <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => rejectMutation.mutate(request.id)}>
+                  <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setRejectTarget(request)}>
                     <X size={14} />
                     Reject
                   </Button>
@@ -317,7 +382,7 @@ export function BorrowingPage() {
 
               {/* Staff cancellation */}
               {!isAdmin && (request.status === "pending_approval" || request.status === "approved") && (
-                <Button variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => cancelMutation.mutate(request.id)}>
+                <Button variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setCancelTarget(request)}>
                   Cancel Request
                 </Button>
               )}
@@ -325,8 +390,17 @@ export function BorrowingPage() {
           </div>
         ))}
 
-        {displayRequests?.length === 0 && (
-          <p className="text-center text-sm text-slate-400 py-6">No borrow requests found in this tab.</p>
+        {requestsQuery.isLoading &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft space-y-3">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-full max-w-sm" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+
+        {!requestsQuery.isLoading && displayRequests?.length === 0 && (
+          <EmptyState title="No borrow requests found in this tab" />
         )}
       </div>
 
@@ -363,6 +437,26 @@ export function BorrowingPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!rejectTarget}
+        title="Reject this request?"
+        description={rejectTarget ? `Request #${rejectTarget.id} will be rejected and the applicant notified.` : undefined}
+        confirmLabel="Reject"
+        variant="danger"
+        onConfirm={() => rejectTarget && rejectMutation.mutate(rejectTarget.id)}
+        onCancel={() => setRejectTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={!!cancelTarget}
+        title="Cancel this request?"
+        description={cancelTarget ? `Request #${cancelTarget.id} will be cancelled. This cannot be undone.` : undefined}
+        confirmLabel="Cancel Request"
+        variant="danger"
+        onConfirm={() => cancelTarget && cancelMutation.mutate(cancelTarget.id)}
+        onCancel={() => setCancelTarget(null)}
+      />
     </div>
   );
 }

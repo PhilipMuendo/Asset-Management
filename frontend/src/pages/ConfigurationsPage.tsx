@@ -5,7 +5,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Input } from "../components/ui/Input";
+import { useToast } from "../components/ui/Toast";
 import { listCategories, createCategory, updateCategory, deleteCategory, listLocations, createLocation, updateLocation, deleteLocation, listSuppliers, createSupplier, updateSupplier, deleteSupplier } from "../services/assets";
 import { listDepartments, createDepartment, updateDepartment, deleteDepartment } from "../services/users";
 
@@ -19,10 +21,12 @@ type ConfigForm = z.infer<typeof configSchema>;
 
 export function ConfigurationsPage() {
   const queryClient = useQueryClient();
+  const { show: showToast } = useToast();
   const [activeTab, setActiveTab] = useState<"categories" | "locations" | "suppliers" | "departments">("categories");
   const [formOpen, setFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
   const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: listLocations });
@@ -36,73 +40,73 @@ export function ConfigurationsPage() {
 
   const createCategoryMutation = useMutation({
     mutationFn: createCategory,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); showToast("Category created"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateCategory(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); showToast("Category updated"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const deleteCategoryMutation = useMutation({
     mutationFn: deleteCategory,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); showToast("Category deleted"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const createLocationMutation = useMutation({
     mutationFn: createLocation,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); showToast("Location created"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const updateLocationMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateLocation(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); showToast("Location updated"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const deleteLocationMutation = useMutation({
     mutationFn: deleteLocation,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); showToast("Location deleted"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const createSupplierMutation = useMutation({
     mutationFn: createSupplier,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); showToast("Supplier created"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const updateSupplierMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateSupplier(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); showToast("Supplier updated"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const deleteSupplierMutation = useMutation({
     mutationFn: deleteSupplier,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); resetForm(); showToast("Supplier deleted"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const createDepartmentMutation = useMutation({
     mutationFn: createDepartment,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); showToast("Department created"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const updateDepartmentMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateDepartment(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); showToast("Department updated"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
   const deleteDepartmentMutation = useMutation({
     mutationFn: deleteDepartment,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); resetForm(); showToast("Department deleted"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
@@ -153,9 +157,16 @@ export function ConfigurationsPage() {
     else if (activeTab === "suppliers") await updateSupplierMutation.mutateAsync({ id: item.id, data });
   }
 
-  async function handleDelete(id: number) {
+  function handleDeleteClick(item: any) {
     setErrorMsg(null);
-    if (!window.confirm("Are you sure you want to delete this master record?")) return;
+    setDeleteTarget({ id: item.id, name: item.name });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
+    setErrorMsg(null);
     try {
       if (activeTab === "categories") await deleteCategoryMutation.mutateAsync(id);
       else if (activeTab === "locations") await deleteLocationMutation.mutateAsync(id);
@@ -285,7 +296,7 @@ export function ConfigurationsPage() {
                     <Button variant="ghost" className="p-1" onClick={() => handleEditClick(cat)}>
                       <Edit3 size={14} />
                     </Button>
-                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(cat.id)}>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDeleteClick(cat)}>
                       <Trash2 size={14} />
                     </Button>
                   </td>
@@ -313,7 +324,7 @@ export function ConfigurationsPage() {
                     <Button variant="ghost" className="p-1" onClick={() => handleEditClick(loc)}>
                       <Edit3 size={14} />
                     </Button>
-                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(loc.id)}>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDeleteClick(loc)}>
                       <Trash2 size={14} />
                     </Button>
                   </td>
@@ -341,7 +352,7 @@ export function ConfigurationsPage() {
                     <Button variant="ghost" className="p-1" onClick={() => handleEditClick(sup)}>
                       <Edit3 size={14} />
                     </Button>
-                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(sup.id)}>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDeleteClick(sup)}>
                       <Trash2 size={14} />
                     </Button>
                   </td>
@@ -357,7 +368,7 @@ export function ConfigurationsPage() {
                     <Button variant="ghost" className="p-1" onClick={() => handleEditClick(dept)}>
                       <Edit3 size={14} />
                     </Button>
-                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDelete(dept.id)}>
+                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDeleteClick(dept)}>
                       <Trash2 size={14} />
                     </Button>
                   </td>
@@ -366,6 +377,16 @@ export function ConfigurationsPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete this master record?"
+        description={deleteTarget ? `"${deleteTarget.name}" will be permanently removed from this list.` : undefined}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

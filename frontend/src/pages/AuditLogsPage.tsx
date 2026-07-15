@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAllAuditLogs } from "../services/borrowing";
+import { Pagination } from "../components/ui/Pagination";
 
 const PAGE_SIZE = 50;
 
@@ -68,27 +69,12 @@ export function AuditLogsPage() {
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>Page {page + 1}</span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="rounded border border-slate-200 px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <button
-            type="button"
-            onClick={() => setPage((p) => p + 1)}
-            disabled={!hasNextPage}
-            className="rounded border border-slate-200 px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <Pagination
+        page={page}
+        hasNextPage={hasNextPage}
+        onPrev={() => setPage((p) => Math.max(0, p - 1))}
+        onNext={() => setPage((p) => p + 1)}
+      />
     </div>
   );
 }

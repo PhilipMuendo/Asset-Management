@@ -1,6 +1,7 @@
-import { LogOut, Users, LayoutDashboard, Wrench, ClipboardList, Settings, History, Sliders } from "lucide-react";
+import { LogOut, Menu, Users, LayoutDashboard, Wrench, ClipboardList, Settings, History, Sliders, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../hooks/useAuth";
 import { cn } from "../utils/cn";
@@ -8,6 +9,12 @@ import { cn } from "../utils/cn";
 export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   async function handleLogout() {
     await logout();
@@ -24,27 +31,52 @@ export function AppLayout() {
           </div>
         </div>
         <nav className="space-y-1 px-3 py-4">
-          <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
-          <NavItem to="/assets" icon={<Wrench size={18} />} label="Assets" />
-          <NavItem to="/borrowing" icon={<ClipboardList size={18} />} label="Borrow requests" />
-          {user?.role === "admin" ? (
-            <>
-              <NavItem to="/users" icon={<Users size={18} />} label="Staff accounts" />
-              <NavItem to="/admin/configurations" icon={<Sliders size={18} />} label="Configurations" />
-              <NavItem to="/audit-logs" icon={<History size={18} />} label="Audit logs" />
-            </>
-          ) : null}
-          <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" />
+          <NavLinks role={user?.role} />
         </nav>
       </aside>
 
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setMobileNavOpen(false)} />
+          <aside className="fixed inset-y-0 left-0 w-64 border-r border-slate-200 bg-white shadow-xl">
+            <div className="flex h-16 items-center justify-between border-b border-slate-200 px-6">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">CEA Assets</p>
+                <p className="text-xs text-slate-500">Internal operations</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close navigation"
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <nav className="space-y-1 px-3 py-4">
+              <NavLinks role={user?.role} />
+            </nav>
+          </aside>
+        </div>
+      )}
+
       <div className="md:pl-64">
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-8">
-          <div>
-            <p className="text-sm font-medium text-slate-900">
-              {user?.first_name} {user?.last_name}
-            </p>
-            <p className="text-xs capitalize text-slate-500">{user?.role}</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label="Open navigation"
+              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 md:hidden"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <div>
+              <p className="text-sm font-medium text-slate-900">
+                {user?.first_name} {user?.last_name}
+              </p>
+              <p className="text-xs capitalize text-slate-500">{user?.role}</p>
+            </div>
           </div>
           <Button variant="ghost" onClick={handleLogout} aria-label="Sign out">
             <LogOut size={18} />
@@ -56,6 +88,24 @@ export function AppLayout() {
         </main>
       </div>
     </div>
+  );
+}
+
+function NavLinks({ role }: { role?: string }) {
+  return (
+    <>
+      <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
+      <NavItem to="/assets" icon={<Wrench size={18} />} label="Assets" />
+      <NavItem to="/borrowing" icon={<ClipboardList size={18} />} label="Borrow requests" />
+      {role === "admin" ? (
+        <>
+          <NavItem to="/users" icon={<Users size={18} />} label="Staff accounts" />
+          <NavItem to="/admin/configurations" icon={<Sliders size={18} />} label="Configurations" />
+          <NavItem to="/audit-logs" icon={<History size={18} />} label="Audit logs" />
+        </>
+      ) : null}
+      <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" />
+    </>
   );
 }
 

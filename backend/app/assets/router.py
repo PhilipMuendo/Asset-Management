@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.audit.service import AuditService
 from app.core.dependencies import get_db, require_admin, get_current_user
 from app.assets.models import AssetCategory, Location, Supplier, Asset, AssetHistory, AssetStatus
-from app.assets.repository import CategoryRepository, LocationRepository, SupplierRepository, AssetRepository
+from app.assets.repository import AssetRepository
+from app.assets.service import CategoryService, LocationService, SupplierService
 from app.assets.schemas import (
     CategoryCreate, CategoryRead, CategoryUpdate,
     LocationCreate, LocationRead, LocationUpdate,
@@ -19,11 +19,8 @@ router = APIRouter()
 # --- Categories ---
 @router.get("/categories", response_model=list[CategoryRead])
 def list_categories(db: Session = Depends(get_db)) -> list[AssetCategory]:
-    items = CategoryRepository(db).list_active()
     counts = AssetRepository(db).usage_counts_by(Asset.category_id)
-    for item in items:
-        item.usage_count = counts.get(item.id, 0)
-    return items
+    return CategoryService(db).list_active(counts)
 
 @router.post("/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
 def create_category(
@@ -31,23 +28,7 @@ def create_category(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> AssetCategory:
-    repo = CategoryRepository(db)
-    existing = repo.get_by_name(payload.name)
-    if existing and not existing.is_archived:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Category name already exists")
-
-    category = repo.add(AssetCategory(name=payload.name, description=payload.description, is_active=payload.is_active if payload.is_active is not None else True))
-    db.flush()
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="category.created",
-        entity_type="category",
-        entity_id=str(category.id),
-        metadata={"name": category.name},
-    )
-    db.commit()
-    db.refresh(category)
-    return category
+    return CategoryService(db).create(payload, admin)
 
 @router.patch("/categories/{category_id}", response_model=CategoryRead)
 def update_category(
@@ -56,29 +37,7 @@ def update_category(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> AssetCategory:
-    repo = CategoryRepository(db)
-    category = repo.get_by_id(category_id)
-    if not category or category.is_archived:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-
-    if payload.name:
-        existing = repo.get_by_name(payload.name)
-        if existing and existing.id != category_id and not existing.is_archived:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Another category with this name already exists")
-
-    for field, val in payload.model_dump(exclude_unset=True).items():
-        setattr(category, field, val)
-
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="category.edited",
-        entity_type="category",
-        entity_id=str(category.id),
-        metadata={"name": category.name},
-    )
-    db.commit()
-    db.refresh(category)
-    return category
+    return CategoryService(db).update(category_id, payload, admin)
 
 @router.delete("/categories/{category_id}")
 def delete_category(
@@ -86,37 +45,14 @@ def delete_category(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    repo = CategoryRepository(db)
-    category = repo.get_by_id(category_id)
-    if not category or category.is_archived:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-
-    usage_count = db.scalar(
-        select(func.count(Asset.id)).where(Asset.category_id == category_id, Asset.status != AssetStatus.ARCHIVED)
-    ) or 0
-    if usage_count > 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Categories with linked assets cannot be deleted")
-
-    category.is_archived = True
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="category.archived",
-        entity_type="category",
-        entity_id=str(category.id),
-        metadata={"name": category.name},
-    )
-    db.commit()
-    return {"message": "Category deleted successfully"}
+    return CategoryService(db).delete(category_id, admin)
 
 
 # --- Locations ---
 @router.get("/locations", response_model=list[LocationRead])
 def list_locations(db: Session = Depends(get_db)) -> list[Location]:
-    items = LocationRepository(db).list_active()
     counts = AssetRepository(db).usage_counts_by(Asset.location_id)
-    for item in items:
-        item.usage_count = counts.get(item.id, 0)
-    return items
+    return LocationService(db).list_active(counts)
 
 @router.post("/locations", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
 def create_location(
@@ -124,23 +60,7 @@ def create_location(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> Location:
-    repo = LocationRepository(db)
-    existing = repo.get_by_name(payload.name)
-    if existing and not existing.is_archived:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Location name already exists")
-
-    location = repo.add(Location(name=payload.name, description=payload.description, is_active=payload.is_active if payload.is_active is not None else True))
-    db.flush()
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="location.created",
-        entity_type="location",
-        entity_id=str(location.id),
-        metadata={"name": location.name},
-    )
-    db.commit()
-    db.refresh(location)
-    return location
+    return LocationService(db).create(payload, admin)
 
 @router.patch("/locations/{location_id}", response_model=LocationRead)
 def update_location(
@@ -149,29 +69,7 @@ def update_location(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> Location:
-    repo = LocationRepository(db)
-    location = repo.get_by_id(location_id)
-    if not location or location.is_archived:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
-
-    if payload.name:
-        existing = repo.get_by_name(payload.name)
-        if existing and existing.id != location_id and not existing.is_archived:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Another location with this name already exists")
-
-    for field, val in payload.model_dump(exclude_unset=True).items():
-        setattr(location, field, val)
-
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="location.renamed",
-        entity_type="location",
-        entity_id=str(location.id),
-        metadata={"name": location.name},
-    )
-    db.commit()
-    db.refresh(location)
-    return location
+    return LocationService(db).update(location_id, payload, admin)
 
 @router.delete("/locations/{location_id}")
 def delete_location(
@@ -179,37 +77,14 @@ def delete_location(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    repo = LocationRepository(db)
-    location = repo.get_by_id(location_id)
-    if not location or location.is_archived:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
-
-    usage_count = db.scalar(
-        select(func.count(Asset.id)).where(Asset.location_id == location_id, Asset.status != AssetStatus.ARCHIVED)
-    ) or 0
-    if usage_count > 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locations with linked assets cannot be deleted")
-
-    location.is_archived = True
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="location.archived",
-        entity_type="location",
-        entity_id=str(location.id),
-        metadata={"name": location.name},
-    )
-    db.commit()
-    return {"message": "Location deleted successfully"}
+    return LocationService(db).delete(location_id, admin)
 
 
 # --- Suppliers ---
 @router.get("/suppliers", response_model=list[SupplierRead])
 def list_suppliers(db: Session = Depends(get_db)) -> list[Supplier]:
-    items = SupplierRepository(db).list_active()
     counts = AssetRepository(db).usage_counts_by(Asset.supplier_id)
-    for item in items:
-        item.usage_count = counts.get(item.id, 0)
-    return items
+    return SupplierService(db).list_active(counts)
 
 @router.post("/suppliers", response_model=SupplierRead, status_code=status.HTTP_201_CREATED)
 def create_supplier(
@@ -217,23 +92,7 @@ def create_supplier(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> Supplier:
-    repo = SupplierRepository(db)
-    existing = repo.get_by_name(payload.name)
-    if existing and not existing.is_archived:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Supplier name already exists")
-
-    supplier = repo.add(Supplier(name=payload.name, contact_info=payload.contact_info, is_active=payload.is_active if payload.is_active is not None else True))
-    db.flush()
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="supplier.created",
-        entity_type="supplier",
-        entity_id=str(supplier.id),
-        metadata={"name": supplier.name},
-    )
-    db.commit()
-    db.refresh(supplier)
-    return supplier
+    return SupplierService(db).create(payload, admin)
 
 @router.patch("/suppliers/{supplier_id}", response_model=SupplierRead)
 def update_supplier(
@@ -242,29 +101,7 @@ def update_supplier(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> Supplier:
-    repo = SupplierRepository(db)
-    supplier = repo.get_by_id(supplier_id)
-    if not supplier or supplier.is_archived:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supplier not found")
-
-    if payload.name:
-        existing = repo.get_by_name(payload.name)
-        if existing and existing.id != supplier_id and not existing.is_archived:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Another supplier with this name already exists")
-
-    for field, val in payload.model_dump(exclude_unset=True).items():
-        setattr(supplier, field, val)
-
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="supplier.edited",
-        entity_type="supplier",
-        entity_id=str(supplier.id),
-        metadata={"name": supplier.name},
-    )
-    db.commit()
-    db.refresh(supplier)
-    return supplier
+    return SupplierService(db).update(supplier_id, payload, admin)
 
 @router.delete("/suppliers/{supplier_id}")
 def delete_supplier(
@@ -272,27 +109,7 @@ def delete_supplier(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    repo = SupplierRepository(db)
-    supplier = repo.get_by_id(supplier_id)
-    if not supplier or supplier.is_archived:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supplier not found")
-
-    usage_count = db.scalar(
-        select(func.count(Asset.id)).where(Asset.supplier_id == supplier_id, Asset.status != AssetStatus.ARCHIVED)
-    ) or 0
-    if usage_count > 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Suppliers with linked assets cannot be deleted")
-
-    supplier.is_archived = True
-    AuditService(db).record(
-        actor_user_id=admin.id,
-        action="supplier.archived",
-        entity_type="supplier",
-        entity_id=str(supplier.id),
-        metadata={"name": supplier.name},
-    )
-    db.commit()
-    return {"message": "Supplier deleted successfully"}
+    return SupplierService(db).delete(supplier_id, admin)
 
 
 # --- Assets ---
@@ -489,10 +306,10 @@ def record_qr_reprint(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    asset = db.get(Asset, asset_id)
+    asset = AssetRepository(db).get_by_id(asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-        
+
     AuditService(db).record(
         actor_user_id=admin.id,
         action="asset.qr_reprinted",
