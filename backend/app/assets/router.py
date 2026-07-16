@@ -327,6 +327,36 @@ def record_qr_reprint(
     return {"message": "QR reprint audit recorded"}
 
 
+@router.get("/{asset_id}/qr.png")
+def get_asset_qr_png(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    import io
+    import qrcode
+    from fastapi.responses import StreamingResponse
+
+    asset = db.get(Asset, asset_id)
+    if not asset or asset.status == AssetStatus.ARCHIVED:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    qr = qrcode.QRCode(version=1, box_size=8, border=2)
+    qr.add_data(asset.permanent_id)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+    png_buffer = io.BytesIO()
+    qr_img.save(png_buffer, format="PNG")
+    png_buffer.seek(0)
+
+    return StreamingResponse(
+        png_buffer,
+        media_type="image/png",
+        headers={"Content-Disposition": f"inline; filename=QR_{asset.permanent_id}.png"}
+    )
+
+
 @router.get("/{asset_id}/qr-pdf")
 def get_asset_qr_pdf(
     asset_id: int,

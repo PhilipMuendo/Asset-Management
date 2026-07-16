@@ -25,6 +25,7 @@ import {
   archiveAsset,
   reprintQrCode
 } from "../services/assets";
+import { API_BASE_URL } from "../services/api";
 import { Asset } from "../types/assets";
 
 const assetSchema = z.object({
@@ -216,50 +217,92 @@ export function AssetsPage() {
     } catch (err) {}
   }
 
-  async function downloadQrPng(permanentId: string, assetId: number) {
-    await triggerReprintAudit(assetId);
-    const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${permanentId}`);
-    const blob = await response.blob();
+  async function fetchAssetBlob(path: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}${path}`, { credentials: "include" });
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status})`);
+    }
+    return response.blob();
+  }
+
+  function saveBlob(blob: Blob, filename: string) {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `QR_${permanentId}.png`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
   }
 
-  async function downloadQrPdfLabel(permanentId: string, name: string, assetId: number) {
-    await triggerReprintAudit(assetId);
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Label - ${permanentId}</title>
-          <style>
-            @page { size: 3in 2in; margin: 0.1in; }
-            body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; font-family: system-ui, sans-serif; margin: 0; }
-            img { width: 1.2in; height: 1.2in; }
-            h2 { margin: 2px 0; font-size: 14px; text-transform: uppercase; font-weight: bold; }
-            p { margin: 0; font-size: 10px; color: #555; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${permanentId}" />
-          <h2>${permanentId}</h2>
-          <p>${name}</p>
-          <p>Collective Energy Africa</p>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+  async function downloadQrPng(permanentId: string, assetId: number) {
+    try {
+      await triggerReprintAudit(assetId);
+      const blob = await fetchAssetBlob(`/assets/${assetId}/qr.png`);
+      saveBlob(blob, `QR_${permanentId}.png`);
+    } catch {
+      showToast("Could not download the QR code image.", "error");
+    }
   }
 
-  async function downloadQrPdf(assetId: number) {
-    await triggerReprintAudit(assetId);
-    window.open(`/api/v1/assets/${assetId}/qr-pdf`, "_blank");
+  async function downloadQrPdfLabel(permanentId: string, name: string, assetId: number) {
+    try {
+      await triggerReprintAudit(assetId);
+      const blob = await fetchAssetBlob(`/assets/${assetId}/qr.png`);
+      const qrUrl = window.URL.createObjectURL(blob);
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        window.URL.revokeObjectURL(qrUrl);
+        showToast("Please allow pop-ups to print labels.", "error");
+        return;
+      }
+
+      const esc = (value: string) =>
+        value.replace(/[&<>"']/g, (c) =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string)
+        );
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print Label - ${esc(permanentId)}</title>
+            <style>
+              @page { size: 3in 2in; margin: 0.1in; }
+              body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; font-family: system-ui, sans-serif; margin: 0; }
+              img { width: 1.2in; height: 1.2in; }
+              h2 { margin: 2px 0; font-size: 14px; text-transform: uppercase; font-weight: bold; }
+              p { margin: 0; font-size: 10px; color: #555; }
+            </style>
+          </head>
+          <body>
+            <img id="qr" src="${qrUrl}" />
+            <h2>${esc(permanentId)}</h2>
+            <p>${esc(name)}</p>
+            <p>Collective Energy Africa</p>
+            <script>
+              var img = document.getElementById('qr');
+              function done() { window.focus(); window.print(); window.close(); }
+              if (img.complete) { done(); } else { img.onload = done; img.onerror = done; }
+            <\/script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch {
+      showToast("Could not prepare the label for printing.", "error");
+    }
+  }
+
+  async function downloadQrPdf(assetId: number, permanentId: string) {
+    try {
+      await triggerReprintAudit(assetId);
+      const blob = await fetchAssetBlob(`/assets/${assetId}/qr-pdf`);
+      saveBlob(blob, `Label_${permanentId}.pdf`);
+    } catch {
+      showToast("Could not download the PDF label.", "error");
+    }
   }
 
   // Filtered assets
@@ -518,7 +561,7 @@ export function AssetsPage() {
             <h3 className="text-lg font-semibold text-slate-950">Asset QR Code Label</h3>
             <div className="my-6 flex flex-col items-center justify-center border border-slate-100 p-4 rounded bg-slate-50">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrAsset.permanent_id}`}
+                src={`${API_BASE_URL}/assets/${qrAsset.id}/qr.png`}
                 alt={qrAsset.permanent_id}
                 className="w-36 h-36 border"
               />
@@ -536,7 +579,7 @@ export function AssetsPage() {
                 </Button>
               </div>
               <div className="flex gap-2">
-                <Button className="flex-1" variant="secondary" onClick={() => downloadQrPdf(qrAsset.id)}>
+                <Button className="flex-1" variant="secondary" onClick={() => downloadQrPdf(qrAsset.id, qrAsset.permanent_id)}>
                   <FileText size={16} />
                   Download PDF
                 </Button>
