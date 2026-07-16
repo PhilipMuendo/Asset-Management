@@ -403,21 +403,9 @@ def get_asset_qr_pdf(
     img.save(pdf_buffer, format="PDF")
     pdf_buffer.seek(0)
 
-    # Record audit log
-    AuditService(db).record(
-        actor_user_id=user.id,
-        action="asset.qr_pdf_downloaded",
-        entity_type="asset",
-        entity_id=str(asset.id),
-        metadata={"permanent_id": asset.permanent_id},
-    )
-    db.add(AssetHistory(
-        asset_id=asset.id,
-        user_id=user.id,
-        action="qr_pdf_downloaded",
-        notes="QR code label PDF downloaded"
-    ))
-    db.commit()
+    # Audit is recorded once by the /reprint-qr endpoint, which the client
+    # calls before every QR download/print action. Recording here too would
+    # double-log every PDF download.
 
     return StreamingResponse(
         pdf_buffer,
