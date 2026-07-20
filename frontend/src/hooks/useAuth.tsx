@@ -2,10 +2,10 @@ import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentUser, login, logout, type LoginPayload } from "../services/auth";
-import type { User } from "../types/user";
+import type { CurrentUser } from "../types/user";
 
 interface AuthContextValue {
-  user: User | null;
+  user: CurrentUser | null;
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   logout: () => Promise<void>;

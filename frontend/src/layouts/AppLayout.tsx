@@ -97,7 +97,7 @@ function NavLinks({ role }: { role?: string }) {
       <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
       <NavItem to="/assets" icon={<Wrench size={18} />} label="Assets" />
       <NavItem to="/borrowing" icon={<ClipboardList size={18} />} label="Borrow requests" />
-      {role === "admin" ? (
+      {role === "admin" || role === "superadmin" ? (
         <>
           <NavItem to="/users" icon={<Users size={18} />} label="Staff accounts" />
           <NavItem to="/admin/configurations" icon={<Sliders size={18} />} label="Configurations" />

@@ -7,6 +7,7 @@ export interface CreateUserPayload {
   email: string;
   phone_number: string;
   department_id: number | null;
+  branch_id: number | null;
   job_title: string | null;
   role: UserRole;
   status: UserStatus;
@@ -16,11 +17,29 @@ export interface CreateUserPayload {
 export function listUsers() {
   return apiRequest<User[]>("/users");
 }
-// 
+//
 export function createUser(payload: CreateUserPayload) {
   return apiRequest<UserCreateResponse>("/users", {
     method: "POST",
     json: payload
+  });
+}
+
+export function updateUser(id: number, payload: Partial<CreateUserPayload>) {
+  return apiRequest<User>(`/users/${id}`, {
+    method: "PATCH",
+    json: payload
+  });
+}
+
+export function listCategoryAssignments(userId: number) {
+  return apiRequest<number[]>(`/users/${userId}/category-assignments`);
+}
+
+export function setCategoryAssignments(userId: number, categoryIds: number[]) {
+  return apiRequest<number[]>(`/users/${userId}/category-assignments`, {
+    method: "PUT",
+    json: { category_ids: categoryIds }
   });
 }
 

@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 from app.assets.models import Asset, AssetHistory, AssetStatus
 from app.assets.repository import AssetRepository
 from app.audit.service import AuditService
+from app.branches.repository import BranchRepository
 from app.borrowing.models import BorrowRequest, BorrowRequestItem, BorrowRequestStatus, BorrowTransaction
 from app.borrowing.repository import BorrowingRepository
 from app.borrowing.schemas import BorrowRequestCreate, BorrowRequestInspect
 from app.users.models import User, UserRole
+from app.users.repository import CategoryAssignmentRepository
 
 VALID_RETURN_CONDITIONS = ["Excellent", "Good", "Fair", "Damaged", "Needs Repair", "Lost"]
 
@@ -27,11 +29,52 @@ class BorrowingService:
         self.db = db
         self.requests = BorrowingRepository(db)
         self.assets = AssetRepository(db)
+        self.branches = BranchRepository(db)
+        self.category_assignments = CategoryAssignmentRepository(db)
         self.audit = AuditService(db)
+
+    def _resolve_branch_id(self, user: User) -> int | None:
+        if user.role == UserRole.STAFF:
+            branch_id = getattr(user, "session_branch_id", None)
+            if branch_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No branch selected for this session; please log in again",
+                )
+            branch = self.branches.get_by_id(branch_id)
+            if not branch or branch.is_archived or not branch.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Selected branch is no longer available; please log in again",
+                )
+            return branch_id
+        if user.role == UserRole.ADMIN:
+            if user.branch_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Your account has no assigned branch; contact a superadmin",
+                )
+            return user.branch_id
+        return None
+
+    def _can_manage(self, admin: User, request: BorrowRequest) -> bool:
+        if admin.role == UserRole.SUPERADMIN:
+            return True
+        if admin.role != UserRole.ADMIN or admin.branch_id is None:
+            return False
+        if request.branch_id != admin.branch_id:
+            return False
+        assigned = set(self.category_assignments.list_category_ids(admin.id))
+        if not assigned:
+            return False
+        item_category_ids = {item.asset.category_id for item in request.items}
+        return item_category_ids.issubset(assigned)
 
     def submit_request(self, payload: BorrowRequestCreate, user: User) -> BorrowRequest:
         if payload.expected_return_date.date() < datetime.now(UTC).date():
             raise HTTPException(status_code=400, detail="Expected return date cannot be in the past")
+
+        branch_id = self._resolve_branch_id(user)
 
         assets: list[Asset] = []
         for asset_id in payload.asset_ids:
@@ -53,6 +96,7 @@ class BorrowingService:
                 status=BorrowRequestStatus.PENDING_APPROVAL,
                 purpose=payload.purpose,
                 expected_return_date=payload.expected_return_date,
+                branch_id=branch_id,
             )
         )
         self.db.flush()
@@ -70,8 +114,12 @@ class BorrowingService:
         self.db.commit()
         return self.requests.get_with_relations(request.id)
 
-    def list_all(self, limit: int, offset: int) -> list[BorrowRequest]:
-        return self.requests.list_all(limit, offset)
+    def list_all(self, current_user: User, limit: int, offset: int) -> list[BorrowRequest]:
+        if current_user.role == UserRole.SUPERADMIN:
+            return self.requests.list_all(limit, offset)
+        if current_user.branch_id is None:
+            return []
+        return self.requests.list_for_branch(current_user.branch_id, limit, offset)
 
     def list_for_user(self, user_id: int) -> list[BorrowRequest]:
         return self.requests.list_for_user(user_id)
@@ -84,6 +132,8 @@ class BorrowingService:
 
     def approve(self, request_id: int, admin: User) -> BorrowRequest:
         request = self._get_or_404(request_id)
+        if not self._can_manage(admin, request):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to approve this request")
         if request.status != BorrowRequestStatus.PENDING_APPROVAL:
             raise HTTPException(status_code=400, detail="Only pending requests can be approved")
 
@@ -109,6 +159,8 @@ class BorrowingService:
 
     def reject(self, request_id: int, admin: User) -> BorrowRequest:
         request = self._get_or_404(request_id)
+        if not self._can_manage(admin, request):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to reject this request")
         if request.status != BorrowRequestStatus.PENDING_APPROVAL:
             raise HTTPException(status_code=400, detail="Only pending requests can be rejected")
 
@@ -129,7 +181,14 @@ class BorrowingService:
     def cancel(self, request_id: int, user: User) -> BorrowRequest:
         request = self._get_or_404(request_id)
 
-        if user.role != UserRole.ADMIN and request.user_id != user.id:
+        if user.role == UserRole.SUPERADMIN:
+            pass
+        elif user.role == UserRole.ADMIN:
+            if request.branch_id != user.branch_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Cannot cancel a request outside your branch"
+                )
+        elif request.user_id != user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot cancel another staff's request")
 
         if request.status not in (BorrowRequestStatus.PENDING_APPROVAL, BorrowRequestStatus.APPROVED):
@@ -159,6 +218,8 @@ class BorrowingService:
 
     def issue(self, request_id: int, admin: User) -> BorrowRequest:
         request = self._get_or_404(request_id)
+        if not self._can_manage(admin, request):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to issue this request")
         if request.status != BorrowRequestStatus.APPROVED:
             raise HTTPException(status_code=400, detail="Only approved requests can be issued")
 
@@ -193,6 +254,8 @@ class BorrowingService:
 
     def return_assets(self, request_id: int, payload: BorrowRequestInspect, admin: User) -> BorrowRequest:
         request = self._get_or_404(request_id)
+        if not self._can_manage(admin, request):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to return this request")
         if request.status not in (BorrowRequestStatus.ISSUED, BorrowRequestStatus.OVERDUE):
             raise HTTPException(status_code=400, detail="Only issued or overdue requests can be returned")
 

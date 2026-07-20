@@ -1,4 +1,4 @@
-import { User } from "./user";
+import { Branch, User } from "./user";
 
 export type AssetStatus = "available" | "reserved" | "borrowed" | "maintenance" | "lost" | "damaged" | "archived";
 
@@ -99,11 +99,13 @@ export interface BorrowRequest {
   expected_return_date: string;
   approved_rejected_at: string | null;
   approved_rejected_by_id: number | null;
+  branch_id: number | null;
   created_at: string;
   updated_at: string;
 
   user: User;
   approved_rejected_by: User | null;
+  branch: Branch | null;
   items: BorrowRequestItem[];
   transactions: BorrowTransaction[];
 }

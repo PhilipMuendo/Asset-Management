@@ -5,7 +5,8 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.database.base import Base
-from app.users.models import User
+from app.users.models import User, AdminCategoryAssignment
+from app.branches.models import Branch
 from app.departments.models import Department
 from app.audit.models import AuditLog
 from app.assets.models import AssetCategory, Location, Supplier, Asset, AssetHistory

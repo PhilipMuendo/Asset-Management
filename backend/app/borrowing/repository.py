@@ -15,6 +15,7 @@ def borrow_request_load_options():
     return (
         joinedload(BorrowRequest.user),
         joinedload(BorrowRequest.approved_rejected_by),
+        joinedload(BorrowRequest.branch),
         selectinload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.category),
         selectinload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.location),
         selectinload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.supplier),
@@ -41,6 +42,18 @@ class BorrowingRepository:
         return list(
             self.db.scalars(
                 select(BorrowRequest)
+                .options(*borrow_request_load_options())
+                .order_by(BorrowRequest.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            ).unique()
+        )
+
+    def list_for_branch(self, branch_id: int, limit: int, offset: int) -> list[BorrowRequest]:
+        return list(
+            self.db.scalars(
+                select(BorrowRequest)
+                .where(BorrowRequest.branch_id == branch_id)
                 .options(*borrow_request_load_options())
                 .order_by(BorrowRequest.created_at.desc())
                 .limit(limit)

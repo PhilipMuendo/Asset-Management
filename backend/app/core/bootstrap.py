@@ -23,7 +23,7 @@ def ensure_first_admin() -> None:
             last_name=settings.first_admin_last_name,
             email=settings.first_admin_email.lower(),
             phone_number="0000000000",
-            role=UserRole.ADMIN,
+            role=UserRole.SUPERADMIN,
             status=UserStatus.ACTIVE,
             password_hash=hash_password(settings.first_admin_password),
             must_change_password=True,

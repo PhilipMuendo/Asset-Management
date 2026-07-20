@@ -20,7 +20,7 @@ export function App() {
           <Route path="/assets" element={<AssetsPage />} />
           <Route path="/borrowing" element={<BorrowingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route element={<ProtectedRoute roles={["admin"]} />}>
+          <Route element={<ProtectedRoute roles={["admin", "superadmin"]} />}>
             <Route path="/users" element={<UsersPage />} />
             <Route path="/admin/configurations" element={<ConfigurationsPage />} />
             <Route path="/audit-logs" element={<AuditLogsPage />} />

@@ -57,7 +57,7 @@ export function AssetsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { show: showToast } = useToast();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);

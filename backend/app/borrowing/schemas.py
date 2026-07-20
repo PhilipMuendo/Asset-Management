@@ -2,6 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from app.borrowing.models import BorrowRequestStatus
 from app.assets.schemas import AssetRead
+from app.branches.schemas import BranchRead
 from app.users.schemas import UserRead
 
 class BorrowRequestCreate(BaseModel):
@@ -47,11 +48,13 @@ class BorrowRequestRead(BaseModel):
     expected_return_date: datetime
     approved_rejected_at: datetime | None
     approved_rejected_by_id: int | None
+    branch_id: int | None
     created_at: datetime
     updated_at: datetime
 
     user: UserRead
     approved_rejected_by: UserRead | None
+    branch: BranchRead | None
     items: list[BorrowRequestItemRead]
     transactions: list[BorrowTransactionRead]
 

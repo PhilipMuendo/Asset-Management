@@ -10,6 +10,7 @@ from app.database.mixins import TimestampMixin
 if TYPE_CHECKING:
     from app.users.models import User
     from app.assets.models import Asset
+    from app.branches.models import Branch
 
 class BorrowRequestStatus(StrEnum):
     PENDING_APPROVAL = "pending_approval"
@@ -33,13 +34,15 @@ class BorrowRequest(TimestampMixin, Base):
     )
     purpose: Mapped[str | None] = mapped_column(Text)
     expected_return_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    
+
     approved_rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_rejected_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
 
     user: Mapped[User] = relationship(foreign_keys=[user_id])
     approved_rejected_by: Mapped[User | None] = relationship(foreign_keys=[approved_rejected_by_id])
-    
+    branch: Mapped[Branch | None] = relationship(foreign_keys=[branch_id])
+
     items: Mapped[list[BorrowRequestItem]] = relationship(back_populates="borrow_request", cascade="all, delete-orphan")
     transactions: Mapped[list[BorrowTransaction]] = relationship(back_populates="borrow_request", cascade="all, delete-orphan")
 

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_admin
+from app.core.dependencies import get_db, require_admin, require_superadmin
 from app.users.models import User
 from app.users.repository import UserRepository
-from app.users.schemas import UserCreate, UserCreateResponse, UserRead, UserUpdate
+from app.users.schemas import CategoryAssignmentUpdate, UserCreate, UserCreateResponse, UserRead, UserUpdate
 from app.users.service import UserService
 
 router = APIRouter()
@@ -40,4 +40,23 @@ def update_user(
     admin: User = Depends(require_admin),
 ) -> User:
     return UserService(db).update_user(user_id, payload, admin)
+
+
+@router.get("/{user_id}/category-assignments", response_model=list[int])
+def list_category_assignments(
+    user_id: int,
+    db: Session = Depends(get_db),
+    superadmin: User = Depends(require_superadmin),
+) -> list[int]:
+    return UserService(db).get_category_ids(user_id)
+
+
+@router.put("/{user_id}/category-assignments", response_model=list[int])
+def set_category_assignments(
+    user_id: int,
+    payload: CategoryAssignmentUpdate,
+    db: Session = Depends(get_db),
+    superadmin: User = Depends(require_superadmin),
+) -> list[int]:
+    return UserService(db).set_category_assignments(user_id, payload.category_ids, superadmin)
 

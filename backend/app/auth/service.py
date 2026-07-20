@@ -4,8 +4,9 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.audit.service import AuditService
+from app.branches.repository import BranchRepository
 from app.core.security import hash_password, verify_password
-from app.users.models import User, UserStatus
+from app.users.models import User, UserRole, UserStatus
 from app.users.repository import UserRepository
 
 
@@ -13,7 +14,21 @@ class AuthService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.users = UserRepository(db)
+        self.branches = BranchRepository(db)
         self.audit = AuditService(db)
+
+    def resolve_session_branch_id(self, user: User, branch_id: int | None) -> int | None:
+        if user.role != UserRole.STAFF:
+            return None
+
+        if branch_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Please select your branch to sign in"
+            )
+        branch = self.branches.get_by_id(branch_id)
+        if not branch or branch.is_archived or not branch.is_active:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected branch is not available")
+        return branch.id
 
     def authenticate(self, email: str, password: str) -> User:
         user = self.users.get_by_email(email)

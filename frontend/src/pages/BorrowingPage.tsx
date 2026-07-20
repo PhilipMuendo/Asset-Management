@@ -44,7 +44,17 @@ export function BorrowingPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { show: showToast } = useToast();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+
+  function canManage(request: BorrowRequest): boolean {
+    if (!user) return false;
+    if (user.role === "superadmin") return true;
+    if (user.role !== "admin" || user.branch_id == null) return false;
+    if (request.branch_id !== user.branch_id) return false;
+    const assigned = new Set(user.category_ids);
+    if (assigned.size === 0) return false;
+    return request.items.every((item) => assigned.has(item.asset.category_id));
+  }
 
   const [formOpen, setFormOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
@@ -353,38 +363,55 @@ export function BorrowingPage() {
             </div>
 
             {/* Actions Panel */}
-            <div className="flex gap-2 flex-wrap items-center">
-              {isAdmin && request.status === "pending_approval" && (
-                <>
-                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => approveMutation.mutate(request.id)}>
-                    <Check size={14} />
-                    Approve
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex gap-2 flex-wrap items-center">
+                {isAdmin && request.status === "pending_approval" && (
+                  <>
+                    <Button
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={!canManage(request)}
+                      onClick={() => approveMutation.mutate(request.id)}
+                    >
+                      <Check size={14} />
+                      Approve
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={!canManage(request)}
+                      onClick={() => setRejectTarget(request)}
+                    >
+                      <X size={14} />
+                      Reject
+                    </Button>
+                  </>
+                )}
+
+                {isAdmin && request.status === "approved" && (
+                  <Button className="bg-brand" disabled={!canManage(request)} onClick={() => issueMutation.mutate(request.id)}>
+                    <PackageCheck size={14} />
+                    Issue Assets
                   </Button>
-                  <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setRejectTarget(request)}>
-                    <X size={14} />
-                    Reject
+                )}
+
+                {isAdmin && (request.status === "issued" || request.status === "overdue") && (
+                  <Button variant="secondary" disabled={!canManage(request)} onClick={() => setReturnRequest(request)}>
+                    Inspect & Receive
                   </Button>
-                </>
-              )}
+                )}
 
-              {isAdmin && request.status === "approved" && (
-                <Button className="bg-brand" onClick={() => issueMutation.mutate(request.id)}>
-                  <PackageCheck size={14} />
-                  Issue Assets
-                </Button>
-              )}
-
-              {isAdmin && (request.status === "issued" || request.status === "overdue") && (
-                <Button variant="secondary" onClick={() => setReturnRequest(request)}>
-                  Inspect & Receive
-                </Button>
-              )}
-
-              {/* Staff cancellation */}
-              {!isAdmin && (request.status === "pending_approval" || request.status === "approved") && (
-                <Button variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setCancelTarget(request)}>
-                  Cancel Request
-                </Button>
+                {/* Staff cancellation */}
+                {!isAdmin && (request.status === "pending_approval" || request.status === "approved") && (
+                  <Button variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setCancelTarget(request)}>
+                    Cancel Request
+                  </Button>
+                )}
+              </div>
+              {isAdmin && user?.role === "admin" && !canManage(request) && request.status !== "returned" && request.status !== "rejected" && request.status !== "cancelled" && (
+                <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                  <AlertCircle size={12} />
+                  Not in your assigned branch/categories
+                </span>
               )}
             </div>
           </div>

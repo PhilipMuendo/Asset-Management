@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
+from app.branches.router import router as branches_router
 from app.core.bootstrap import ensure_first_admin
 from app.core.config import settings
 from app.departments.router import router as departments_router
@@ -30,6 +31,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(branches_router, prefix="/api/v1/branches", tags=["Branches"])
 app.include_router(departments_router, prefix="/api/v1/departments", tags=["Departments"])
 app.include_router(users_router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(assets_router, prefix="/api/v1/assets", tags=["Assets"])

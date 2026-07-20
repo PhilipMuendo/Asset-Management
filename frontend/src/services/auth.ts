@@ -1,13 +1,14 @@
 import { apiRequest } from "./api";
-import type { User } from "../types/user";
+import type { CurrentUser } from "../types/user";
 
 export interface LoginPayload {
   email: string;
   password: string;
+  branch_id?: number | null;
 }
 
 export interface AuthResponse {
-  user: User;
+  user: CurrentUser;
   must_change_password: boolean;
 }
 
@@ -23,11 +24,11 @@ export function logout() {
 }
 
 export function getCurrentUser() {
-  return apiRequest<User>("/auth/me");
+  return apiRequest<CurrentUser>("/auth/me");
 }
 
 export function changePassword(payload: any) {
-  return apiRequest<User>("/auth/change-password", {
+  return apiRequest<CurrentUser>("/auth/change-password", {
     method: "POST",
     json: payload
   });

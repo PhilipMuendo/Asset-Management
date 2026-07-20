@@ -1,11 +1,12 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
-from app.users.schemas import UserRead
+from app.users.schemas import CurrentUserRead
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    branch_id: int | None = None
 
     @field_validator("email")
     @classmethod
@@ -14,7 +15,7 @@ class LoginRequest(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    user: UserRead
+    user: CurrentUserRead
     must_change_password: bool
 
 

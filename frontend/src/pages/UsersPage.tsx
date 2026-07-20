@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Plus, Search } from "lucide-react";
+import { Check, Copy, Plus, Search, Shield } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Badge } from "../components/ui/Badge";
@@ -13,7 +13,11 @@ import { Pagination } from "../components/ui/Pagination";
 import { Select } from "../components/ui/Select";
 import { SkeletonRow } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
-import { createUser, listDepartments, listUsers } from "../services/users";
+import { useAuth } from "../hooks/useAuth";
+import { listBranches } from "../services/branches";
+import { listCategories } from "../services/assets";
+import { createUser, listCategoryAssignments, listDepartments, listUsers, setCategoryAssignments } from "../services/users";
+import type { User } from "../types/user";
 
 const schema = z.object({
   first_name: z.string().min(2),
@@ -21,8 +25,9 @@ const schema = z.object({
   email: z.string().email(),
   phone_number: z.string().min(7),
   department_id: z.coerce.number().nullable(),
+  branch_id: z.coerce.number().nullable(),
   job_title: z.string().optional(),
-  role: z.enum(["admin", "staff"]),
+  role: z.enum(["superadmin", "admin", "staff"]),
   status: z.enum(["active", "suspended", "archived"]),
   password: z.string().min(8).max(128).optional().or(z.literal(""))
 });
@@ -32,6 +37,8 @@ type UserForm = z.infer<typeof schema>;
 const PAGE_SIZE = 10;
 
 export function UsersPage() {
+  const { user: currentUser } = useAuth();
+  const isSuperadmin = currentUser?.role === "superadmin";
   const queryClient = useQueryClient();
   const { show: showToast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
@@ -39,8 +46,10 @@ export function UsersPage() {
   const [copied, setCopied] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [managingCategoriesFor, setManagingCategoriesFor] = useState<User | null>(null);
   const usersQuery = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: listDepartments });
+  const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: listBranches });
   const form = useForm<UserForm>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -49,12 +58,15 @@ export function UsersPage() {
       email: "",
       phone_number: "",
       department_id: null,
+      branch_id: null,
       job_title: "",
       role: "staff",
       status: "active",
       password: ""
     }
   });
+
+  const selectedRole = form.watch("role");
 
   const createMutation = useMutation({
     mutationFn: createUser,
@@ -74,6 +86,7 @@ export function UsersPage() {
     await createMutation.mutateAsync({
       ...values,
       department_id: values.department_id || null,
+      branch_id: values.role === "admin" ? values.branch_id || null : null,
       job_title: values.job_title || null,
       password: values.password || undefined
     });
@@ -147,7 +160,8 @@ export function UsersPage() {
             <Field label="Role">
               <Select {...form.register("role")}>
                 <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
+                {isSuperadmin ? <option value="admin">Branch admin</option> : null}
+                {isSuperadmin ? <option value="superadmin">Superadmin</option> : null}
               </Select>
             </Field>
             <Field label="Status">
@@ -157,6 +171,21 @@ export function UsersPage() {
                 <option value="archived">Archived</option>
               </Select>
             </Field>
+            {selectedRole === "admin" ? (
+              <Field label="Branch">
+                <Select {...form.register("branch_id")}>
+                  <option value="">Select a branch</option>
+                  {branchesQuery.data?.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name} ({branch.code})
+                    </option>
+                  ))}
+                </Select>
+                <p className="mt-1 text-xs text-slate-500">
+                  A branch admin can only approve borrow requests submitted from this branch.
+                </p>
+              </Field>
+            ) : null}
             <Field label="Password (optional)">
               <Input type="text" {...form.register("password")} placeholder="Auto-generated if left blank" />
               <p className="mt-1 text-xs text-slate-500">
@@ -198,13 +227,15 @@ export function UsersPage() {
                 <th className="px-4 py-3 font-semibold">Name</th>
                 <th className="px-4 py-3 font-semibold">Email</th>
                 <th className="px-4 py-3 font-semibold">Role</th>
+                <th className="px-4 py-3 font-semibold">Branch</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold">Created</th>
+                {isSuperadmin ? <th className="px-4 py-3 font-semibold">Actions</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {usersQuery.isLoading &&
-                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} columns={5} />)}
+                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} columns={7} />)}
               {pagedUsers?.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 font-medium text-slate-900">
@@ -214,12 +245,27 @@ export function UsersPage() {
                   <td className="px-4 py-3">
                     <Badge value={user.role} />
                   </td>
+                  <td className="px-4 py-3 text-slate-500">
+                    {user.branch_id
+                      ? branchesQuery.data?.find((b) => b.id === user.branch_id)?.name ?? `#${user.branch_id}`
+                      : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge value={user.status} />
                   </td>
                   <td className="px-4 py-3 text-slate-500">
                     {new Intl.DateTimeFormat().format(new Date(user.created_at))}
                   </td>
+                  {isSuperadmin ? (
+                    <td className="px-4 py-3">
+                      {user.role === "admin" ? (
+                        <Button variant="ghost" className="p-1 text-xs" onClick={() => setManagingCategoriesFor(user)}>
+                          <Shield size={14} />
+                          Manage categories
+                        </Button>
+                      ) : null}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -259,6 +305,10 @@ export function UsersPage() {
           </div>
         </div>
       ) : null}
+
+      {managingCategoriesFor ? (
+        <CategoryAssignmentModal user={managingCategoriesFor} onClose={() => setManagingCategoriesFor(null)} />
+      ) : null}
     </div>
   );
 }
@@ -269,5 +319,71 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {label}
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+function CategoryAssignmentModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const { show: showToast } = useToast();
+  const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
+  const assignmentsQuery = useQuery({
+    queryKey: ["category-assignments", user.id],
+    queryFn: () => listCategoryAssignments(user.id)
+  });
+  const [selected, setSelected] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (assignmentsQuery.data) {
+      setSelected(assignmentsQuery.data);
+    }
+  }, [assignmentsQuery.data]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => setCategoryAssignments(user.id, selected),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["category-assignments", user.id] });
+      showToast("Category assignments updated");
+      onClose();
+    }
+  });
+
+  function toggle(categoryId: number) {
+    setSelected((prev) =>
+      prev.includes(categoryId) ? prev.filter((id) => id !== categoryId) : [...prev, categoryId]
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl border border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-950">
+          Categories for {user.first_name} {user.last_name}
+        </h3>
+        <p className="mt-1 text-sm text-slate-500">
+          This branch admin can only approve borrow requests where every item's category is checked below.
+          No categories checked means they cannot approve anything.
+        </p>
+        <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+          {categoriesQuery.data?.map((category) => (
+            <label key={category.id} className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={selected.includes(category.id)}
+                onChange={() => toggle(category.id)}
+              />
+              {category.name}
+            </label>
+          ))}
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? "Saving" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

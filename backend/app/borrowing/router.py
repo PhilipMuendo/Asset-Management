@@ -26,7 +26,7 @@ def list_borrow_requests(
     limit: int = Query(2000, ge=1, le=5000),
     offset: int = Query(0, ge=0),
 ) -> list[BorrowRequest]:
-    return BorrowingService(db).list_all(limit=limit, offset=offset)
+    return BorrowingService(db).list_all(admin, limit=limit, offset=offset)
 
 
 @router.get("/my-requests", response_model=list[BorrowRequestRead])

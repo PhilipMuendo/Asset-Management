@@ -5,7 +5,7 @@ import { getDashboardSummary, listMyBorrowRequests, listBorrowRequests } from ".
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   const adminSummaryQuery = useQuery({
     queryKey: ["dashboard-summary"],

@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "staff";
+export type UserRole = "superadmin" | "admin" | "staff";
 export type UserStatus = "active" | "suspended" | "archived";
 
 export interface User {
@@ -8,6 +8,7 @@ export interface User {
   email: string;
   phone_number: string;
   department_id: number | null;
+  branch_id: number | null;
   job_title: string | null;
   role: UserRole;
   status: UserStatus;
@@ -15,6 +16,11 @@ export interface User {
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CurrentUser extends User {
+  category_ids: number[];
+  session_branch_id: number | null;
 }
 
 export interface UserCreateResponse extends User {
@@ -26,6 +32,19 @@ export interface Department {
   name: string;
   description: string | null;
   is_archived: boolean;
+  usage_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Branch {
+  id: number;
+  name: string;
+  code: string;
+  country: string;
+  address: string | null;
+  is_archived: boolean;
+  is_active: boolean;
   usage_count?: number;
   created_at: string;
   updated_at: string;
