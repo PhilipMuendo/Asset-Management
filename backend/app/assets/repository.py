@@ -1,16 +1,12 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session, joinedload
 
-from app.assets.models import AssetCategory, Location, Supplier, Asset, AssetHistory, AssetStatus
+from app.assets.models import AssetCategory, Supplier, Asset, AssetHistory, AssetStatus
 from app.core.reference_data import ReferenceDataRepository
 
 
 def CategoryRepository(db: Session) -> ReferenceDataRepository[AssetCategory]:
     return ReferenceDataRepository(db, AssetCategory)
-
-
-def LocationRepository(db: Session) -> ReferenceDataRepository[Location]:
-    return ReferenceDataRepository(db, Location)
 
 
 def SupplierRepository(db: Session) -> ReferenceDataRepository[Supplier]:
@@ -27,7 +23,7 @@ class AssetRepository:
             .where(Asset.status != AssetStatus.ARCHIVED)
             .options(
                 joinedload(Asset.category),
-                joinedload(Asset.location),
+                joinedload(Asset.branch),
                 joinedload(Asset.supplier),
             )
             .order_by(Asset.permanent_id.asc())

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload
 from app.core.dependencies import get_db, require_admin
-from app.assets.models import Asset, AssetCategory, AssetStatus, Location, Supplier
+from app.assets.models import Asset, AssetCategory, AssetStatus, Supplier
 from app.borrowing.models import BorrowRequest, BorrowRequestStatus
 from app.users.models import User, UserStatus
 from app.departments.models import Department

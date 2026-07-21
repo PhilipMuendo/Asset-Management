@@ -9,7 +9,7 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Input } from "../components/ui/Input";
 import { useToast } from "../components/ui/Toast";
 import { useAuth } from "../hooks/useAuth";
-import { listCategories, createCategory, updateCategory, deleteCategory, listLocations, createLocation, updateLocation, deleteLocation, listSuppliers, createSupplier, updateSupplier, deleteSupplier } from "../services/assets";
+import { listCategories, createCategory, updateCategory, deleteCategory, listSuppliers, createSupplier, updateSupplier, deleteSupplier } from "../services/assets";
 import { listBranches, createBranch, updateBranch, deleteBranch } from "../services/branches";
 import { listDepartments, createDepartment, updateDepartment, deleteDepartment } from "../services/users";
 
@@ -29,14 +29,13 @@ export function ConfigurationsPage() {
   const { show: showToast } = useToast();
   const { user } = useAuth();
   const isSuperadmin = user?.role === "superadmin";
-  const [activeTab, setActiveTab] = useState<"categories" | "locations" | "suppliers" | "departments" | "branches">("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "suppliers" | "departments" | "branches">("categories");
   const [formOpen, setFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
-  const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: listLocations });
   const suppliersQuery = useQuery({ queryKey: ["suppliers"], queryFn: listSuppliers });
   const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: listDepartments });
   const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: listBranches });
@@ -61,24 +60,6 @@ export function ConfigurationsPage() {
   const deleteCategoryMutation = useMutation({
     mutationFn: deleteCategory,
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["categories"] }); resetForm(); showToast("Category deleted"); },
-    onError: (err: any) => setErrorMsg(err.message)
-  });
-
-  const createLocationMutation = useMutation({
-    mutationFn: createLocation,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); showToast("Location created"); },
-    onError: (err: any) => setErrorMsg(err.message)
-  });
-
-  const updateLocationMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => updateLocation(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); showToast("Location updated"); },
-    onError: (err: any) => setErrorMsg(err.message)
-  });
-
-  const deleteLocationMutation = useMutation({
-    mutationFn: deleteLocation,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["locations"] }); resetForm(); showToast("Location deleted"); },
     onError: (err: any) => setErrorMsg(err.message)
   });
 
@@ -171,12 +152,10 @@ export function ConfigurationsPage() {
         else data.contact_info = values.contact_info;
 
         if (activeTab === "categories") await updateCategoryMutation.mutateAsync({ id: editingItem.id, data });
-        else if (activeTab === "locations") await updateLocationMutation.mutateAsync({ id: editingItem.id, data });
         else if (activeTab === "suppliers") await updateSupplierMutation.mutateAsync({ id: editingItem.id, data });
         else if (activeTab === "departments") await updateDepartmentMutation.mutateAsync({ id: editingItem.id, data });
       } else {
         if (activeTab === "categories") await createCategoryMutation.mutateAsync({ name: values.name, description: values.description });
-        else if (activeTab === "locations") await createLocationMutation.mutateAsync({ name: values.name, description: values.description });
         else if (activeTab === "suppliers") await createSupplierMutation.mutateAsync({ name: values.name, contact_info: values.contact_info });
         else if (activeTab === "departments") await createDepartmentMutation.mutateAsync({ name: values.name, description: values.description });
         else if (activeTab === "branches")
@@ -194,7 +173,6 @@ export function ConfigurationsPage() {
     setErrorMsg(null);
     const data = { is_active: !item.is_active };
     if (activeTab === "categories") await updateCategoryMutation.mutateAsync({ id: item.id, data });
-    else if (activeTab === "locations") await updateLocationMutation.mutateAsync({ id: item.id, data });
     else if (activeTab === "suppliers") await updateSupplierMutation.mutateAsync({ id: item.id, data });
     else if (activeTab === "branches") await updateBranchMutation.mutateAsync({ id: item.id, data });
   }
@@ -211,7 +189,6 @@ export function ConfigurationsPage() {
     setErrorMsg(null);
     try {
       if (activeTab === "categories") await deleteCategoryMutation.mutateAsync(id);
-      else if (activeTab === "locations") await deleteLocationMutation.mutateAsync(id);
       else if (activeTab === "suppliers") await deleteSupplierMutation.mutateAsync(id);
       else if (activeTab === "departments") await deleteDepartmentMutation.mutateAsync(id);
       else if (activeTab === "branches") await deleteBranchMutation.mutateAsync(id);
@@ -224,7 +201,7 @@ export function ConfigurationsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-normal text-slate-950">Master Data Configuration</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage asset categories, warehouse storage locations, suppliers, and departments.
+            Manage asset categories, suppliers, departments, and branches.
           </p>
         </div>
         {(activeTab !== "branches" || isSuperadmin) && (
@@ -237,7 +214,7 @@ export function ConfigurationsPage() {
 
       <div className="border-b border-slate-200">
         <nav className="flex gap-6" aria-label="Tabs">
-          {(["categories", "locations", "suppliers", "departments", "branches"] as const).map((tab) => (
+          {(["categories", "suppliers", "departments", "branches"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => {
@@ -331,7 +308,7 @@ export function ConfigurationsPage() {
               {activeTab !== "departments" && (
                 <th className="px-6 py-4">Status</th>
               )}
-              <th className="px-6 py-4">{activeTab === "branches" ? "Branch Admins" : "Assets Linked"}</th>
+              <th className="px-6 py-4">{activeTab === "branches" ? "Usage" : "Assets Linked"}</th>
               {(activeTab !== "branches" || isSuperadmin) && <th className="px-6 py-4">Actions</th>}
             </tr>
           </thead>
@@ -359,34 +336,6 @@ export function ConfigurationsPage() {
                       <Edit3 size={14} />
                     </Button>
                     <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDeleteClick(cat)}>
-                      <Trash2 size={14} />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            {activeTab === "locations" &&
-              locationsQuery.data?.map((loc) => (
-                <tr key={loc.id}>
-                  <td className="px-6 py-4 font-medium">{loc.name}</td>
-                  <td className="px-6 py-4 text-slate-500">{loc.description || "—"}</td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => toggleActiveStatus(loc)}
-                      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border ${
-                        loc.is_active
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : "bg-slate-100 text-slate-500 border-slate-200"
-                      }`}
-                    >
-                      {loc.is_active ? "Active" : "Inactive"}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 text-slate-900 font-semibold">{loc.usage_count}</td>
-                  <td className="px-6 py-4 flex gap-2">
-                    <Button variant="ghost" className="p-1" onClick={() => handleEditClick(loc)}>
-                      <Edit3 size={14} />
-                    </Button>
-                    <Button variant="ghost" className="p-1 text-red-600 hover:text-red-700" onClick={() => handleDeleteClick(loc)}>
                       <Trash2 size={14} />
                     </Button>
                   </td>
@@ -456,7 +405,9 @@ export function ConfigurationsPage() {
                       {branch.is_active ? "Active" : "Inactive"}
                     </button>
                   </td>
-                  <td className="px-6 py-4 text-slate-900 font-semibold">{branch.usage_count}</td>
+                  <td className="px-6 py-4 text-slate-900 font-semibold">
+                    {branch.admin_count ?? 0} admin{(branch.admin_count ?? 0) === 1 ? "" : "s"} · {branch.asset_count ?? 0} asset{(branch.asset_count ?? 0) === 1 ? "" : "s"}
+                  </td>
                   {isSuperadmin && (
                     <td className="px-6 py-4 flex gap-2">
                       <Button variant="ghost" className="p-1" onClick={() => handleEditClick(branch)}>

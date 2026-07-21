@@ -1,5 +1,5 @@
 import { apiRequest } from "./api";
-import { Asset, AssetCategory, Location, Supplier } from "../types/assets";
+import { Asset, AssetCategory, Supplier } from "../types/assets";
 
 export async function listCategories(): Promise<AssetCategory[]> {
   return apiRequest<AssetCategory[]>("/assets/categories");
@@ -21,30 +21,6 @@ export async function updateCategory(id: number, data: { name?: string; descript
 
 export async function deleteCategory(id: number): Promise<void> {
   return apiRequest<void>(`/assets/categories/${id}`, {
-    method: "DELETE"
-  });
-}
-
-export async function listLocations(): Promise<Location[]> {
-  return apiRequest<Location[]>("/assets/locations");
-}
-
-export async function createLocation(data: { name: string; description?: string }): Promise<Location> {
-  return apiRequest<Location>("/assets/locations", {
-    method: "POST",
-    json: data
-  });
-}
-
-export async function updateLocation(id: number, data: { name?: string; description?: string; is_active?: boolean }): Promise<Location> {
-  return apiRequest<Location>(`/assets/locations/${id}`, {
-    method: "PATCH",
-    json: data
-  });
-}
-
-export async function deleteLocation(id: number): Promise<void> {
-  return apiRequest<void>(`/assets/locations/${id}`, {
     method: "DELETE"
   });
 }
@@ -92,7 +68,7 @@ export async function createAsset(data: {
   model_number?: string;
   description?: string;
   category_id: number;
-  location_id: number;
+  branch_id: number;
   supplier_id?: number;
 }): Promise<Asset> {
   return apiRequest<Asset>("/assets", {
@@ -110,7 +86,7 @@ export async function updateAsset(
     description: string;
     status: string;
     category_id: number;
-    location_id: number;
+    branch_id: number;
     supplier_id: number;
   }>
 ): Promise<Asset> {

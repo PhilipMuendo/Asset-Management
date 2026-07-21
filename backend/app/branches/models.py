@@ -9,6 +9,7 @@ from app.database.base import Base
 from app.database.mixins import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.assets.models import Asset
     from app.users.models import User
 
 
@@ -24,3 +25,4 @@ class Branch(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     admins: Mapped[list[User]] = relationship(back_populates="branch")
+    assets: Mapped[list[Asset]] = relationship(back_populates="branch")

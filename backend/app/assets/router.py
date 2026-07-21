@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.audit.service import AuditService
 from app.core.dependencies import get_db, require_admin, get_current_user
-from app.assets.models import AssetCategory, Location, Supplier, Asset, AssetHistory, AssetStatus
+from app.assets.models import AssetCategory, Supplier, Asset, AssetHistory, AssetStatus
 from app.assets.repository import AssetRepository
-from app.assets.service import CategoryService, LocationService, SupplierService
+from app.assets.service import CategoryService, SupplierService
 from app.assets.schemas import (
     CategoryCreate, CategoryRead, CategoryUpdate,
-    LocationCreate, LocationRead, LocationUpdate,
     SupplierCreate, SupplierRead, SupplierUpdate,
     AssetCreate, AssetUpdate, AssetRead,
     AssetHistoryRead
@@ -46,38 +45,6 @@ def delete_category(
     admin: User = Depends(require_admin),
 ):
     return CategoryService(db).delete(category_id, admin)
-
-
-# --- Locations ---
-@router.get("/locations", response_model=list[LocationRead])
-def list_locations(db: Session = Depends(get_db)) -> list[Location]:
-    counts = AssetRepository(db).usage_counts_by(Asset.location_id)
-    return LocationService(db).list_active(counts)
-
-@router.post("/locations", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
-def create_location(
-    payload: LocationCreate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
-) -> Location:
-    return LocationService(db).create(payload, admin)
-
-@router.patch("/locations/{location_id}", response_model=LocationRead)
-def update_location(
-    location_id: int,
-    payload: LocationUpdate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
-) -> Location:
-    return LocationService(db).update(location_id, payload, admin)
-
-@router.delete("/locations/{location_id}")
-def delete_location(
-    location_id: int,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
-):
-    return LocationService(db).delete(location_id, admin)
 
 
 # --- Suppliers ---
@@ -165,7 +132,7 @@ def create_asset(
         model_number=payload.model_number,
         description=payload.description,
         category_id=payload.category_id,
-        location_id=payload.location_id,
+        branch_id=payload.branch_id,
         supplier_id=payload.supplier_id,
         status=AssetStatus.AVAILABLE,
     ))

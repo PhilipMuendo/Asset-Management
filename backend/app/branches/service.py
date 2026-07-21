@@ -1,12 +1,14 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.assets.models import Asset
+from app.assets.repository import AssetRepository
 from app.branches.models import Branch
 from app.core.reference_data import ReferenceDataService
 from app.users.models import User, UserRole, UserStatus
 
 
-def _branch_usage_counts(db: Session) -> dict[int, int]:
+def _branch_admin_counts(db: Session) -> dict[int, int]:
     return dict(
         db.execute(
             select(User.branch_id, func.count(User.id))
@@ -18,6 +20,19 @@ def _branch_usage_counts(db: Session) -> dict[int, int]:
             .group_by(User.branch_id)
         ).all()
     )
+
+
+def _branch_asset_counts(db: Session) -> dict[int, int]:
+    return AssetRepository(db).usage_counts_by(Asset.branch_id)
+
+
+def _branch_usage_counts(db: Session) -> dict[int, int]:
+    admin_counts = _branch_admin_counts(db)
+    asset_counts = _branch_asset_counts(db)
+    combined: dict[int, int] = dict(admin_counts)
+    for branch_id, count in asset_counts.items():
+        combined[branch_id] = combined.get(branch_id, 0) + count
+    return combined
 
 
 def BranchService(db: Session) -> ReferenceDataService[Branch]:
@@ -36,5 +51,5 @@ def BranchService(db: Session) -> ReferenceDataService[Branch]:
         delete_action="branch.archived",
         delete_success_message="Branch deleted successfully",
         usage_count_fn=_usage_count,
-        usage_conflict_detail="Branches with assigned branch admins cannot be deleted",
+        usage_conflict_detail="Branches with assigned admins or linked assets cannot be deleted",
     )

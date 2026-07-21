@@ -18,13 +18,13 @@ import {
   listAssets,
   createAsset,
   listCategories,
-  listLocations,
   listSuppliers,
   getAssetHistory,
   updateAsset,
   archiveAsset,
   reprintQrCode
 } from "../services/assets";
+import { listBranches } from "../services/branches";
 import { API_BASE_URL } from "../services/api";
 import { Asset } from "../types/assets";
 
@@ -35,7 +35,7 @@ const assetSchema = z.object({
   model_number: z.string().optional(),
   description: z.string().optional(),
   category_id: z.coerce.number().min(1, "Please select a category"),
-  location_id: z.coerce.number().min(1, "Please select a location"),
+  branch_id: z.coerce.number().min(1, "Please select a branch"),
   supplier_id: z.coerce.number().optional(),
 
   // Purchase & EAM Info
@@ -72,7 +72,7 @@ export function AssetsPage() {
 
   const assetsQuery = useQuery({ queryKey: ["assets"], queryFn: listAssets });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
-  const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: listLocations });
+  const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: listBranches });
   const suppliersQuery = useQuery({ queryKey: ["suppliers"], queryFn: listSuppliers });
 
   const historyQuery = useQuery({
@@ -90,7 +90,7 @@ export function AssetsPage() {
       model_number: "",
       description: "",
       category_id: 0,
-      location_id: 0,
+      branch_id: 0,
       condition: "Good"
     }
   });
@@ -141,7 +141,7 @@ export function AssetsPage() {
       model_number: "",
       description: "",
       category_id: 0,
-      location_id: 0,
+      branch_id: 0,
       purchase_date: "",
       purchase_cost: 0,
       invoice_number: "",
@@ -164,7 +164,7 @@ export function AssetsPage() {
       model_number: asset.model_number || "",
       description: asset.description || "",
       category_id: asset.category_id,
-      location_id: asset.location_id,
+      branch_id: asset.branch_id,
       supplier_id: asset.supplier_id || undefined,
       purchase_date: asset.purchase_date ? new Date(asset.purchase_date).toISOString().split("T")[0] : "",
       purchase_cost: asset.purchase_cost || 0,
@@ -189,7 +189,7 @@ export function AssetsPage() {
       model_number: values.model_number || undefined,
       description: values.description || undefined,
       category_id: values.category_id,
-      location_id: values.location_id,
+      branch_id: values.branch_id,
       supplier_id: values.supplier_id || undefined,
       purchase_date: values.purchase_date ? new Date(values.purchase_date).toISOString() : undefined,
       purchase_cost: values.purchase_cost || undefined,
@@ -387,11 +387,11 @@ export function AssetsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Location</label>
-              <Select className="mt-1.5" {...form.register("location_id")}>
-                <option value="">Select Location</option>
-                {locationsQuery.data?.filter(l => l.is_active).map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Branch</label>
+              <Select className="mt-1.5" {...form.register("branch_id")}>
+                <option value="">Select Branch</option>
+                {branchesQuery.data?.filter(b => b.is_active).map((branch) => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
                 ))}
               </Select>
             </div>
@@ -480,7 +480,7 @@ export function AssetsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search by ID, Name, Serial, Category, Supplier, Location..."
+            placeholder="Search by ID, Name, Serial, Category, Supplier, Branch..."
             className="pl-9"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
@@ -525,7 +525,7 @@ export function AssetsPage() {
                 <Badge value={asset.status} />
               </div>
               <h3 className="mt-2 text-base font-semibold text-slate-900">{asset.name}</h3>
-              <p className="mt-1 text-xs text-slate-500">{asset.category?.name} • {asset.location?.name}</p>
+              <p className="mt-1 text-xs text-slate-500">{asset.category?.name} • {asset.branch?.name}</p>
               {asset.serial_number && (
                 <p className="mt-1 text-[11px] text-slate-400">S/N: {asset.serial_number}</p>
               )}
@@ -649,8 +649,8 @@ export function AssetsPage() {
                 <Badge value={selectedAsset.condition.toLowerCase()} className="mt-1" />
               </div>
               <div>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">Location</span>
-                <p className="font-semibold text-slate-900 mt-1">{selectedAsset.location?.name}</p>
+                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">Branch</span>
+                <p className="font-semibold text-slate-900 mt-1">{selectedAsset.branch?.name}</p>
               </div>
               <div>
                 <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">Category</span>

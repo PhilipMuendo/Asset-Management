@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from app.assets.models import AssetStatus
+from app.branches.schemas import BranchRead
 
 # Category
 class CategoryCreate(BaseModel):
@@ -9,25 +10,6 @@ class CategoryCreate(BaseModel):
     is_active: bool | None = Field(default=True)
 
 class CategoryRead(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    is_archived: bool
-    is_active: bool
-    usage_count: int | None = Field(default=0)
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# Location
-class LocationCreate(BaseModel):
-    name: str = Field(min_length=2, max_length=80)
-    description: str | None = Field(default=None, max_length=500)
-    is_active: bool | None = Field(default=True)
-
-class LocationRead(BaseModel):
     id: int
     name: str
     description: str | None
@@ -81,7 +63,7 @@ class AssetCreate(BaseModel):
     model_number: str | None = Field(default=None, max_length=100)
     description: str | None = Field(default=None)
     category_id: int
-    location_id: int
+    branch_id: int
     supplier_id: int | None = Field(default=None)
 
     purchase_date: datetime | None = Field(default=None)
@@ -100,7 +82,7 @@ class AssetUpdate(BaseModel):
     description: str | None = Field(default=None)
     status: AssetStatus | None = Field(default=None)
     category_id: int | None = Field(default=None)
-    location_id: int | None = Field(default=None)
+    branch_id: int | None = Field(default=None)
     supplier_id: int | None = Field(default=None)
 
     purchase_date: datetime | None = Field(default=None)
@@ -121,7 +103,7 @@ class AssetRead(BaseModel):
     description: str | None
     status: AssetStatus
     category_id: int
-    location_id: int
+    branch_id: int
     supplier_id: int | None
     created_at: datetime
     updated_at: datetime
@@ -136,19 +118,13 @@ class AssetRead(BaseModel):
     condition: str
 
     category: CategoryRead
-    location: LocationRead
+    branch: BranchRead
     supplier: SupplierRead | None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class CategoryUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=2, max_length=80)
-    description: str | None = Field(default=None, max_length=500)
-    is_active: bool | None = Field(default=None)
-
-
-class LocationUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=80)
     description: str | None = Field(default=None, max_length=500)
     is_active: bool | None = Field(default=None)

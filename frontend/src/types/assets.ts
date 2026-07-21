@@ -13,17 +13,6 @@ export interface AssetCategory {
   updated_at: string;
 }
 
-export interface Location {
-  id: number;
-  name: string;
-  description: string | null;
-  is_archived: boolean;
-  is_active: boolean;
-  usage_count?: number;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Supplier {
   id: number;
   name: string;
@@ -44,7 +33,7 @@ export interface Asset {
   description: string | null;
   status: AssetStatus;
   category_id: number;
-  location_id: number;
+  branch_id: number;
   supplier_id: number | null;
   created_at: string;
   updated_at: string;
@@ -60,7 +49,7 @@ export interface Asset {
   condition: string;
 
   category: AssetCategory;
-  location: Location;
+  branch: Branch;
   supplier: Supplier | null;
 }
 

@@ -17,7 +17,7 @@ def borrow_request_load_options():
         joinedload(BorrowRequest.approved_rejected_by),
         joinedload(BorrowRequest.branch),
         selectinload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.category),
-        selectinload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.location),
+        selectinload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.branch),
         selectinload(BorrowRequest.items).joinedload(BorrowRequestItem.asset).joinedload(Asset.supplier),
         selectinload(BorrowRequest.transactions).joinedload(BorrowTransaction.issued_by),
         selectinload(BorrowRequest.transactions).joinedload(BorrowTransaction.received_by),

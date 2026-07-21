@@ -2,7 +2,7 @@ from typing import Callable
 
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
-from app.assets.models import Asset, AssetCategory, Location, Supplier
+from app.assets.models import Asset, AssetCategory, Supplier
 from app.assets.repository import AssetRepository
 from app.core.reference_data import ReferenceDataService
 
@@ -28,23 +28,6 @@ def CategoryService(db: Session) -> ReferenceDataService[AssetCategory]:
         delete_success_message="Category deleted successfully",
         usage_count_fn=_usage_count(db, Asset.category_id),
         usage_conflict_detail="Categories with linked assets cannot be deleted",
-    )
-
-
-def LocationService(db: Session) -> ReferenceDataService[Location]:
-    return ReferenceDataService(
-        db,
-        Location,
-        entity_type="location",
-        not_found_detail="Location not found",
-        create_conflict_detail="Location name already exists",
-        update_conflict_detail="Another location with this name already exists",
-        create_action="location.created",
-        update_action="location.renamed",
-        delete_action="location.archived",
-        delete_success_message="Location deleted successfully",
-        usage_count_fn=_usage_count(db, Asset.location_id),
-        usage_conflict_detail="Locations with linked assets cannot be deleted",
     )
 
 
