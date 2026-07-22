@@ -17,12 +17,14 @@ const schema = z.object({
 });
 
 type LoginForm = z.infer<typeof schema>;
+type LoginMode = "staff" | "admin";
 
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<LoginMode>("staff");
   const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: listBranches });
   const form = useForm<LoginForm>({
     resolver: zodResolver(schema),
@@ -37,10 +39,25 @@ export function LoginPage() {
     return <Navigate to="/" replace />;
   }
 
+  function switchMode(next: LoginMode) {
+    setMode(next);
+    if (next === "admin") {
+      form.setValue("branch_id", undefined);
+      form.clearErrors("branch_id");
+    }
+  }
+
   async function onSubmit(values: LoginForm) {
     setError(null);
+    if (mode === "staff" && !values.branch_id) {
+      form.setError("branch_id", {
+        type: "manual",
+        message: "Select the branch you're signing in from"
+      });
+      return;
+    }
     try {
-      await login({ ...values, branch_id: values.branch_id ?? null });
+      await login({ ...values, branch_id: mode === "staff" ? values.branch_id ?? null : null });
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/";
       navigate(destination, { replace: true });
     } catch (err) {
@@ -61,6 +78,27 @@ export function LoginPage() {
           </p>
         </div>
 
+        <div className="mb-5 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => switchMode("staff")}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition ${
+              mode === "staff" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Staff
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("admin")}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition ${
+              mode === "admin" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Admin
+          </button>
+        </div>
+
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <label className="block text-sm font-medium text-slate-700">
             Company email
@@ -75,20 +113,27 @@ export function LoginPage() {
               {...form.register("password")}
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700">
-            Branch
-            <Select className="mt-1" {...form.register("branch_id")}>
-              <option value="">Admin / superadmin — leave blank</option>
-              {branchesQuery.data?.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name} ({branch.code})
-                </option>
-              ))}
-            </Select>
-            <span className="mt-1 block text-xs text-slate-500">
-              Staff: select the branch you're signing in from. Admins and superadmins can leave this blank.
-            </span>
-          </label>
+          {mode === "staff" ? (
+            <label className="block text-sm font-medium text-slate-700">
+              Branch
+              <Select className="mt-1" {...form.register("branch_id")}>
+                <option value="">Select your branch</option>
+                {branchesQuery.data
+                  ?.filter((branch) => branch.is_active)
+                  .map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name} ({branch.code})
+                    </option>
+                  ))}
+              </Select>
+              <span className="mt-1 block text-xs text-slate-500">
+                Select the branch you're signing in from.
+              </span>
+              {form.formState.errors.branch_id && (
+                <p className="mt-1.5 text-xs text-red-600">{form.formState.errors.branch_id.message}</p>
+              )}
+            </label>
+          ) : null}
           {error ? (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}

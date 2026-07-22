@@ -175,7 +175,7 @@ export function UsersPage() {
               <Field label="Branch">
                 <Select {...form.register("branch_id")}>
                   <option value="">Select a branch</option>
-                  {branchesQuery.data?.map((branch) => (
+                  {branchesQuery.data?.filter((b) => b.is_active).map((branch) => (
                     <option key={branch.id} value={branch.id}>
                       {branch.name} ({branch.code})
                     </option>

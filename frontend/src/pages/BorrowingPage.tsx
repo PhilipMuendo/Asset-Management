@@ -410,7 +410,7 @@ export function BorrowingPage() {
               {isAdmin && user?.role === "admin" && !canManage(request) && request.status !== "returned" && request.status !== "rejected" && request.status !== "cancelled" && (
                 <span className="inline-flex items-center gap-1 text-xs text-amber-600">
                   <AlertCircle size={12} />
-                  Not in your assigned branch/categories
+                  Not in your assigned categories
                 </span>
               )}
             </div>
