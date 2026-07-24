@@ -406,7 +406,7 @@ export function ConfigurationsPage() {
                     </button>
                   </td>
                   <td className="px-6 py-4 text-slate-900 font-semibold">
-                    {branch.admin_count ?? 0} admin{(branch.admin_count ?? 0) === 1 ? "" : "s"} · {branch.asset_count ?? 0} asset{(branch.asset_count ?? 0) === 1 ? "" : "s"}
+                    {branch.admin_count ?? 0} admin{(branch.admin_count ?? 0) === 1 ? "" : "s"} · {branch.staff_count ?? 0} staff · {branch.asset_count ?? 0} asset{(branch.asset_count ?? 0) === 1 ? "" : "s"}
                   </td>
                   {isSuperadmin && (
                     <td className="px-6 py-4 flex gap-2">

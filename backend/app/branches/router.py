@@ -7,6 +7,7 @@ from app.branches.service import (
     BranchService,
     _branch_admin_counts,
     _branch_asset_counts,
+    _branch_staff_counts,
     _branch_usage_counts,
 )
 from app.core.dependencies import get_db, require_superadmin
@@ -18,14 +19,16 @@ router = APIRouter()
 @router.get("", response_model=list[BranchRead])
 def list_branches(db: Session = Depends(get_db)) -> list[Branch]:
     admin_counts = _branch_admin_counts(db)
+    staff_counts = _branch_staff_counts(db)
     asset_counts = _branch_asset_counts(db)
     usage_counts = {
-        branch_id: admin_counts.get(branch_id, 0) + asset_counts.get(branch_id, 0)
-        for branch_id in set(admin_counts) | set(asset_counts)
+        branch_id: admin_counts.get(branch_id, 0) + staff_counts.get(branch_id, 0) + asset_counts.get(branch_id, 0)
+        for branch_id in set(admin_counts) | set(staff_counts) | set(asset_counts)
     }
     branches = BranchService(db).list_active(usage_counts)
     for branch in branches:
         branch.admin_count = admin_counts.get(branch.id, 0)
+        branch.staff_count = staff_counts.get(branch.id, 0)
         branch.asset_count = asset_counts.get(branch.id, 0)
     return branches
 

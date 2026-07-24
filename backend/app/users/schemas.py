@@ -29,10 +29,10 @@ class UserCreate(UserBase):
 
     @model_validator(mode="after")
     def validate_branch_for_role(self) -> "UserCreate":
-        if self.role == UserRole.ADMIN and self.branch_id is None:
-            raise ValueError("A branch must be assigned to a branch admin account")
-        if self.role != UserRole.ADMIN and self.branch_id is not None:
-            raise ValueError("branch_id can only be set for branch admin accounts")
+        if self.role in (UserRole.ADMIN, UserRole.STAFF) and self.branch_id is None:
+            raise ValueError("A branch must be assigned to this account")
+        if self.role == UserRole.SUPERADMIN and self.branch_id is not None:
+            raise ValueError("branch_id cannot be set for a superadmin account")
         return self
 
 

@@ -22,16 +22,32 @@ def _branch_admin_counts(db: Session) -> dict[int, int]:
     )
 
 
+def _branch_staff_counts(db: Session) -> dict[int, int]:
+    return dict(
+        db.execute(
+            select(User.branch_id, func.count(User.id))
+            .where(
+                User.status != UserStatus.ARCHIVED,
+                User.role == UserRole.STAFF,
+                User.branch_id.is_not(None),
+            )
+            .group_by(User.branch_id)
+        ).all()
+    )
+
+
 def _branch_asset_counts(db: Session) -> dict[int, int]:
     return AssetRepository(db).usage_counts_by(Asset.branch_id)
 
 
 def _branch_usage_counts(db: Session) -> dict[int, int]:
     admin_counts = _branch_admin_counts(db)
+    staff_counts = _branch_staff_counts(db)
     asset_counts = _branch_asset_counts(db)
     combined: dict[int, int] = dict(admin_counts)
-    for branch_id, count in asset_counts.items():
-        combined[branch_id] = combined.get(branch_id, 0) + count
+    for counts in (staff_counts, asset_counts):
+        for branch_id, count in counts.items():
+            combined[branch_id] = combined.get(branch_id, 0) + count
     return combined
 
 
@@ -51,5 +67,5 @@ def BranchService(db: Session) -> ReferenceDataService[Branch]:
         delete_action="branch.archived",
         delete_success_message="Branch deleted successfully",
         usage_count_fn=_usage_count,
-        usage_conflict_detail="Branches with assigned admins or linked assets cannot be deleted",
+        usage_conflict_detail="Branches with assigned admins, staff, or linked assets cannot be deleted",
     )

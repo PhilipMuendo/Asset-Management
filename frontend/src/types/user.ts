@@ -47,6 +47,7 @@ export interface Branch {
   is_active: boolean;
   usage_count?: number;
   admin_count?: number;
+  staff_count?: number;
   asset_count?: number;
   created_at: string;
   updated_at: string;

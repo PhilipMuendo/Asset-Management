@@ -100,7 +100,12 @@ export function UsersPage() {
     await createMutation.mutateAsync({
       ...values,
       department_id: values.department_id || null,
-      branch_id: values.role === "admin" ? values.branch_id || null : null,
+      branch_id:
+        values.role === "admin" || values.role === "staff"
+          ? isSuperadmin
+            ? values.branch_id || null
+            : currentUser?.branch_id ?? null
+          : null,
       job_title: values.job_title || null,
       password: values.password || undefined
     });
@@ -185,20 +190,33 @@ export function UsersPage() {
                 <option value="archived">Archived</option>
               </Select>
             </Field>
-            {selectedRole === "admin" ? (
-              <Field label="Branch">
-                <Select {...form.register("branch_id")}>
-                  <option value="">Select a branch</option>
-                  {branchesQuery.data?.filter((b) => b.is_active).map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name} ({branch.code})
-                    </option>
-                  ))}
-                </Select>
-                <p className="mt-1 text-xs text-slate-500">
-                  A branch admin can only approve borrow requests submitted from this branch.
-                </p>
-              </Field>
+            {selectedRole === "admin" || selectedRole === "staff" ? (
+              isSuperadmin ? (
+                <Field label="Branch">
+                  <Select {...form.register("branch_id")}>
+                    <option value="">Select a branch</option>
+                    {branchesQuery.data?.filter((b) => b.is_active).map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name} ({branch.code})
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {selectedRole === "admin"
+                      ? "A branch admin can only approve borrow requests submitted from this branch."
+                      : "The branch this staff member works at. They can still select a different branch to borrow from at login."}
+                  </p>
+                </Field>
+              ) : (
+                <Field label="Branch">
+                  <p className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    {branchesQuery.data?.find((b) => b.id === currentUser?.branch_id)?.name ?? "Your branch"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Staff you create are automatically assigned to your branch.
+                  </p>
+                </Field>
+              )
             ) : null}
             <Field label="Password (optional)">
               <Input type="text" {...form.register("password")} placeholder="Auto-generated if left blank" />
@@ -244,50 +262,63 @@ export function UsersPage() {
                 <th className="px-4 py-3 font-semibold">Branch</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold">Created</th>
-                {isSuperadmin ? <th className="px-4 py-3 font-semibold">Actions</th> : null}
+                {isSuperadmin || currentUser?.role === "admin" ? (
+                  <th className="px-4 py-3 font-semibold">Actions</th>
+                ) : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {usersQuery.isLoading &&
                 Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} columns={7} />)}
-              {pagedUsers?.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    {user.first_name} {user.last_name}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{user.email}</td>
-                  <td className="px-4 py-3">
-                    <Badge value={user.role} />
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {user.branch_id
-                      ? branchesQuery.data?.find((b) => b.id === user.branch_id)?.name ?? `#${user.branch_id}`
-                      : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge value={user.status} />
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {new Intl.DateTimeFormat().format(new Date(user.created_at))}
-                  </td>
-                  {isSuperadmin ? (
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" className="p-1 text-xs" onClick={() => setEditingUser(user)}>
-                          <Pencil size={14} />
-                          Edit
-                        </Button>
-                        {user.role === "admin" ? (
-                          <Button variant="ghost" className="p-1 text-xs" onClick={() => setManagingCategoriesFor(user)}>
-                            <Shield size={14} />
-                            Manage categories
-                          </Button>
-                        ) : null}
-                      </div>
+              {pagedUsers?.map((user) => {
+                const canEdit =
+                  isSuperadmin ||
+                  (currentUser?.role === "admin" &&
+                    user.role === "staff" &&
+                    user.branch_id === currentUser.branch_id);
+                return (
+                  <tr key={user.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {user.first_name} {user.last_name}
                     </td>
-                  ) : null}
-                </tr>
-              ))}
+                    <td className="px-4 py-3 text-slate-600">{user.email}</td>
+                    <td className="px-4 py-3">
+                      <Badge value={user.role} />
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {user.branch_id
+                        ? branchesQuery.data?.find((b) => b.id === user.branch_id)?.name ?? `#${user.branch_id}`
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge value={user.status} />
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {new Intl.DateTimeFormat().format(new Date(user.created_at))}
+                    </td>
+                    {isSuperadmin || currentUser?.role === "admin" ? (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {canEdit ? (
+                            <Button variant="ghost" className="p-1 text-xs" onClick={() => setEditingUser(user)}>
+                              <Pencil size={14} />
+                              Edit
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                          {isSuperadmin && user.role === "admin" ? (
+                            <Button variant="ghost" className="p-1 text-xs" onClick={() => setManagingCategoriesFor(user)}>
+                              <Shield size={14} />
+                              Manage categories
+                            </Button>
+                          ) : null}
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -379,8 +410,13 @@ function EditUserModal({
     mutationFn: (values: EditUserForm) =>
       updateUser(user.id, {
         ...values,
+        role: isSuperadmin ? values.role : user.role,
         department_id: values.department_id || null,
-        branch_id: values.role === "admin" ? values.branch_id || null : null,
+        branch_id: isSuperadmin
+          ? values.role === "admin" || values.role === "staff"
+            ? values.branch_id || null
+            : null
+          : user.branch_id,
         job_title: values.job_title || null
       }),
     onSuccess: async () => {
@@ -437,9 +473,9 @@ function EditUserModal({
               <option value="archived">Archived</option>
             </Select>
           </Field>
-          {selectedRole === "admin" ? (
+          {selectedRole === "admin" || selectedRole === "staff" ? (
             <Field label="Branch">
-              <Select {...form.register("branch_id")}>
+              <Select {...form.register("branch_id")} disabled={!isSuperadmin}>
                 <option value="">Select a branch</option>
                 {branchesQuery.data?.filter((b) => b.is_active).map((branch) => (
                   <option key={branch.id} value={branch.id}>
@@ -448,7 +484,9 @@ function EditUserModal({
                 ))}
               </Select>
               <p className="mt-1 text-xs text-slate-500">
-                A branch admin can only approve borrow requests submitted from this branch.
+                {selectedRole === "admin"
+                  ? "A branch admin can only approve borrow requests submitted from this branch."
+                  : "The branch this staff member works at. They can still select a different branch to borrow from at login."}
               </p>
             </Field>
           ) : null}

@@ -56,7 +56,7 @@ class User(TimestampMixin, Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     department: Mapped[Department | None] = relationship(back_populates="users")
-    branch: Mapped[Branch | None] = relationship(back_populates="admins")
+    branch: Mapped[Branch | None] = relationship(back_populates="members")
 
     @property
     def full_name(self) -> str:

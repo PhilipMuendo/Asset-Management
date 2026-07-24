@@ -21,6 +21,7 @@ class BranchRead(BaseModel):
     is_active: bool
     usage_count: int | None = Field(default=0)
     admin_count: int | None = Field(default=0)
+    staff_count: int | None = Field(default=0)
     asset_count: int | None = Field(default=0)
     created_at: datetime
     updated_at: datetime

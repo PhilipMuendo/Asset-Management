@@ -30,20 +30,35 @@ class UserService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only a superadmin can assign admin or superadmin roles",
             )
-        if target_role == UserRole.ADMIN:
+        if target_role in (UserRole.ADMIN, UserRole.STAFF):
             if branch_id is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="A branch must be assigned to a branch admin account",
+                    detail="A branch must be assigned to this account",
                 )
             branch = self.branches.get_by_id(branch_id)
             if not branch or branch.is_archived:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or archived branch")
+            if target_role == UserRole.STAFF and actor.role == UserRole.ADMIN and branch_id != actor.branch_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You can only manage staff at your own branch",
+                )
         elif branch_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="branch_id can only be set for branch admin accounts",
+                detail="branch_id cannot be set for a superadmin account",
             )
+
+    def _assert_can_edit_target(self, actor: User, target: User) -> None:
+        if actor.role == UserRole.SUPERADMIN:
+            return
+        if actor.role == UserRole.ADMIN and target.role == UserRole.STAFF and target.branch_id == actor.branch_id:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only edit staff at your own branch",
+        )
 
     def create_user(self, payload: UserCreate, actor: User) -> tuple[User, str]:
         if self.users.get_by_email(payload.email):
@@ -96,6 +111,8 @@ class UserService:
         user = self.users.get_by_id(user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        self._assert_can_edit_target(actor, user)
 
         updates = payload.model_dump(exclude_unset=True)
         if "department_id" in updates and updates["department_id"]:

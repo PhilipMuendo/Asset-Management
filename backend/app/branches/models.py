@@ -24,5 +24,5 @@ class Branch(TimestampMixin, Base):
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    admins: Mapped[list[User]] = relationship(back_populates="branch")
+    members: Mapped[list[User]] = relationship(back_populates="branch")
     assets: Mapped[list[Asset]] = relationship(back_populates="branch")
