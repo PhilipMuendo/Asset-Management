@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Plus, Search, Shield } from "lucide-react";
+import { Check, Copy, Pencil, Plus, Search, Shield } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -16,7 +16,7 @@ import { useToast } from "../components/ui/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { listBranches } from "../services/branches";
 import { listCategories } from "../services/assets";
-import { createUser, listCategoryAssignments, listDepartments, listUsers, setCategoryAssignments } from "../services/users";
+import { createUser, listCategoryAssignments, listDepartments, listUsers, setCategoryAssignments, updateUser } from "../services/users";
 import type { User } from "../types/user";
 
 const schema = z.object({
@@ -34,6 +34,19 @@ const schema = z.object({
 
 type UserForm = z.infer<typeof schema>;
 
+const editSchema = z.object({
+  first_name: z.string().min(2),
+  last_name: z.string().min(2),
+  phone_number: z.string().min(7),
+  department_id: z.coerce.number().nullable(),
+  branch_id: z.coerce.number().nullable(),
+  job_title: z.string().optional(),
+  role: z.enum(["superadmin", "admin", "staff"]),
+  status: z.enum(["active", "suspended", "archived"])
+});
+
+type EditUserForm = z.infer<typeof editSchema>;
+
 const PAGE_SIZE = 10;
 
 export function UsersPage() {
@@ -47,6 +60,7 @@ export function UsersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [managingCategoriesFor, setManagingCategoriesFor] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const usersQuery = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: listDepartments });
   const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: listBranches });
@@ -258,12 +272,18 @@ export function UsersPage() {
                   </td>
                   {isSuperadmin ? (
                     <td className="px-4 py-3">
-                      {user.role === "admin" ? (
-                        <Button variant="ghost" className="p-1 text-xs" onClick={() => setManagingCategoriesFor(user)}>
-                          <Shield size={14} />
-                          Manage categories
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" className="p-1 text-xs" onClick={() => setEditingUser(user)}>
+                          <Pencil size={14} />
+                          Edit
                         </Button>
-                      ) : null}
+                        {user.role === "admin" ? (
+                          <Button variant="ghost" className="p-1 text-xs" onClick={() => setManagingCategoriesFor(user)}>
+                            <Shield size={14} />
+                            Manage categories
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -309,6 +329,10 @@ export function UsersPage() {
       {managingCategoriesFor ? (
         <CategoryAssignmentModal user={managingCategoriesFor} onClose={() => setManagingCategoriesFor(null)} />
       ) : null}
+
+      {editingUser ? (
+        <EditUserModal user={editingUser} isSuperadmin={isSuperadmin} onClose={() => setEditingUser(null)} />
+      ) : null}
     </div>
   );
 }
@@ -319,6 +343,131 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {label}
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+function EditUserModal({
+  user,
+  isSuperadmin,
+  onClose
+}: {
+  user: User;
+  isSuperadmin: boolean;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { show: showToast } = useToast();
+  const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: listDepartments });
+  const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: listBranches });
+  const form = useForm<EditUserForm>({
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      first_name: user.first_name,
+      last_name: user.last_name,
+      phone_number: user.phone_number,
+      department_id: user.department_id,
+      branch_id: user.branch_id,
+      job_title: user.job_title ?? "",
+      role: user.role,
+      status: user.status
+    }
+  });
+
+  const selectedRole = form.watch("role");
+
+  const updateMutation = useMutation({
+    mutationFn: (values: EditUserForm) =>
+      updateUser(user.id, {
+        ...values,
+        department_id: values.department_id || null,
+        branch_id: values.role === "admin" ? values.branch_id || null : null,
+        job_title: values.job_title || null
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      showToast("Account updated");
+      onClose();
+    }
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl border border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-950">
+          Edit {user.first_name} {user.last_name}
+        </h3>
+        <p className="mt-1 text-sm text-slate-500">{user.email}</p>
+        <form
+          className="mt-4 grid gap-4 sm:grid-cols-2"
+          onSubmit={form.handleSubmit((values) => updateMutation.mutate(values))}
+        >
+          <Field label="First name">
+            <Input {...form.register("first_name")} />
+          </Field>
+          <Field label="Last name">
+            <Input {...form.register("last_name")} />
+          </Field>
+          <Field label="Phone number">
+            <Input {...form.register("phone_number")} />
+          </Field>
+          <Field label="Job title">
+            <Input {...form.register("job_title")} />
+          </Field>
+          <Field label="Department">
+            <Select {...form.register("department_id")}>
+              <option value="">Unassigned</option>
+              {departmentsQuery.data?.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Role">
+            <Select {...form.register("role")} disabled={!isSuperadmin}>
+              <option value="staff">Staff</option>
+              {isSuperadmin ? <option value="admin">Branch admin</option> : null}
+              {isSuperadmin ? <option value="superadmin">Superadmin</option> : null}
+            </Select>
+          </Field>
+          <Field label="Status">
+            <Select {...form.register("status")}>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+              <option value="archived">Archived</option>
+            </Select>
+          </Field>
+          {selectedRole === "admin" ? (
+            <Field label="Branch">
+              <Select {...form.register("branch_id")}>
+                <option value="">Select a branch</option>
+                {branchesQuery.data?.filter((b) => b.is_active).map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name} ({branch.code})
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-1 text-xs text-slate-500">
+                A branch admin can only approve borrow requests submitted from this branch.
+              </p>
+            </Field>
+          ) : null}
+          {updateMutation.error ? (
+            <div className="sm:col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {updateMutation.error instanceof Error ? updateMutation.error.message : "Could not update account"}
+            </div>
+          ) : null}
+          <div className="flex justify-end gap-2 sm:col-span-2">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving" : "Save changes"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
